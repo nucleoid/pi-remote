@@ -639,9 +639,11 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                     if (connected && showSettings) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            FilledTonalButton(onClick = { showSettings = false }) { Text("Done") }
+                            Text("Settings", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                            TextButton(onClick = { showSettings = false }) { Text("Close") }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
