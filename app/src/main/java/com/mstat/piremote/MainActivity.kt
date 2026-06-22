@@ -202,6 +202,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
     var autoConnectRequest by remember { mutableIntStateOf(0) }
     val messages = remember { mutableStateListOf<ChatItem>() }
     val activeToolMessages = remember { mutableStateMapOf<String, Long>() }
+    val pendingUserEchoes = remember { mutableStateListOf<String>() }
     val listState = rememberLazyListState()
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
@@ -397,14 +398,19 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
         ws.send(json.toString())
 
         when (type) {
-            "prompt", "steer", "follow_up" -> addMessage(
-                ChatKind.User,
-                type.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                listOfNotNull(
+            "prompt", "steer", "follow_up" -> {
+                val displayedText = listOfNotNull(
                     text.orEmpty().takeIf { it.isNotBlank() },
                     attachments.takeIf { it.isNotEmpty() }?.joinToString(prefix = "Attachments: ") { it.name },
                 ).joinToString("\n")
-            )
+                if (displayedText.isNotBlank()) pendingUserEchoes.add(displayedText)
+                if (pendingUserEchoes.size > 10) pendingUserEchoes.removeRange(0, pendingUserEchoes.size - 10)
+                addMessage(
+                ChatKind.User,
+                type.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                displayedText
+                )
+            }
             "abort" -> addMessage(ChatKind.System, "Abort", "Abort requested")
             "get_state", "ping" -> addMessage(ChatKind.System, type, "Requested")
         }
@@ -465,6 +471,15 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                         setSessionInfo = { sessionInfo = it },
                         setWorking = { working = it },
                         clearActiveAssistant = { activeAssistantId = null },
+                        suppressUserEcho = { echoedText ->
+                            val index = pendingUserEchoes.indexOfFirst { it == echoedText }
+                            if (index >= 0) {
+                                pendingUserEchoes.removeAt(index)
+                                true
+                            } else {
+                                false
+                            }
+                        },
                     )
                 }
             }
@@ -606,7 +621,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
     MaterialTheme(colorScheme = if (isSystemInDarkTheme()) PiDarkColors else PiLightColors) {
         Scaffold(
             topBar = {
-                if (!keyboardVisible) BrandedTopBar(
+                BrandedTopBar(
                     connected = connected,
                     connecting = connecting,
                     showSettings = showSettings,
@@ -1063,8 +1078,7 @@ private fun ComposerPanel(
                 keyboardActions = KeyboardActions(onSend = { if (sendEnabled) sendWithPulse() }),
             )
 
-            if (!keyboardVisible) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onAttach() },
                         enabled = attachments.size < 4,
@@ -1090,7 +1104,6 @@ private fun ComposerPanel(
                         ),
                     ) { Text("Abort", maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                 }
-            }
         }
     }
     if (confirmAbort) {
@@ -1283,6 +1296,7 @@ private fun handleIncoming(
     setSessionInfo: (String) -> Unit,
     setWorking: (Boolean) -> Unit,
     clearActiveAssistant: () -> Unit,
+    suppressUserEcho: (String) -> Boolean,
 ) {
     try {
         val obj = JSONObject(text)
@@ -1295,7 +1309,7 @@ private fun handleIncoming(
             "user_message" -> {
                 val message = obj.optJSONObject("message")
                 val textContent = extractMessageText(message)
-                if (textContent.isNotBlank()) addMessage(ChatKind.User, "User", textContent)
+                if (textContent.isNotBlank() && !suppressUserEcho(textContent)) addMessage(ChatKind.User, "User", textContent)
             }
             "history" -> {
                 val history = obj.optJSONArray("messages")
@@ -1362,7 +1376,7 @@ private fun handleIncoming(
                 if (eventType == "user_message") {
                     val message = obj.optJSONObject("message")
                     val textContent = extractMessageText(message)
-                    if (textContent.isNotBlank()) addMessage(ChatKind.User, "User", textContent)
+                    if (textContent.isNotBlank() && !suppressUserEcho(textContent)) addMessage(ChatKind.User, "User", textContent)
                 } else if (eventType != "session_shutdown") {
                     addMessage(ChatKind.System, eventType, summarizeRawEvent(obj))
                 }
