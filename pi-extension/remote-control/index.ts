@@ -173,22 +173,93 @@ function authenticate(req: any, config: RemoteConfig): boolean {
   return queryToken === config.token || bearer === config.token;
 }
 
-function buildUserContent(text: string, images?: any[], files?: any[]) {
+const MAX_BINARY_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_TEXT_ATTACHMENT_BYTES = 200 * 1024;
+const MAX_ATTACHMENTS = 4;
+export const REMOTE_CONTROL_MAX_PAYLOAD = 32 * 1024 * 1024;
+
+function cleanAttachmentName(name: unknown): string {
+  if (typeof name !== "string" || !name.trim()) throw new Error("Attachment name is required");
+  return name.trim().replace(/[\r\n]/g, " ").slice(0, 240);
+}
+
+function cleanMimeType(mimeType: unknown, fallback = "application/octet-stream"): string {
+  if (typeof mimeType !== "string" || !mimeType.trim()) return fallback;
+  const clean = mimeType.trim().toLowerCase();
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(clean)) throw new Error("Invalid attachment MIME type");
+  return clean;
+}
+
+function decodedBase64Length(data: string): number {
+  const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return (data.length / 4) * 3 - padding;
+}
+
+function isSupportedImageBytes(mimeType: string, bytes: Buffer): boolean {
+  if (mimeType === "image/png") return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  if (mimeType === "image/jpeg" || mimeType === "image/jpg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mimeType === "image/gif") return bytes.length >= 6 && (bytes.subarray(0, 6).toString("ascii") === "GIF87a" || bytes.subarray(0, 6).toString("ascii") === "GIF89a");
+  if (mimeType === "image/webp") return bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
+}
+
+function decodeBase64Attachment(name: string, data: unknown): Buffer {
+  if (typeof data !== "string" || !data.trim() || !/^[A-Za-z0-9+/]*={0,2}$/.test(data) || data.length % 4 !== 0) {
+    throw new Error(`Invalid base64 attachment: ${name}`);
+  }
+  if (decodedBase64Length(data) > MAX_BINARY_ATTACHMENT_BYTES) throw new Error(`Attachment ${name} exceeds 5MB`);
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.toString("base64") !== data.replace(/=+$/, "") + "=".repeat((4 - (data.replace(/=+$/, "").length % 4)) % 4)) {
+    throw new Error(`Invalid base64 attachment: ${name}`);
+  }
+  return bytes;
+}
+
+export function remoteHello(state: unknown) {
+  return {
+    type: "hello",
+    server: "pi-remote-control",
+    protocolVersion: 2,
+    capabilities: { binaryFileAttachments: true },
+    state,
+  };
+}
+
+export function buildUserContent(text: string, images?: any[], files?: any[]) {
   const content: any[] = [];
   if (text) content.push({ type: "text", text });
+  if ((images?.length ?? 0) + (files?.length ?? 0) > MAX_ATTACHMENTS) throw new Error(`At most ${MAX_ATTACHMENTS} attachments are supported`);
   for (const file of files ?? []) {
-    if (!file?.text || !file?.name) continue;
+    if (!file?.name) continue;
+    const name = cleanAttachmentName(file.name);
+    const mimeType = cleanMimeType(file.mimeType, file.encoding === "base64" ? "application/octet-stream" : "text/plain");
+    if (file.encoding === "base64" || file.data) {
+      if (file.encoding !== "base64") throw new Error(`Binary attachment ${name} must declare encoding: base64`);
+      const bytes = decodeBase64Attachment(name, file.data);
+      content.push({
+        type: "text",
+        text: `Attached binary file: ${name} (${mimeType}, ${bytes.length} B). The file was received as an attachment; binary bytes are intentionally not inlined.`,
+      });
+      continue;
+    }
+    if (typeof file.text !== "string") continue;
+    if (Buffer.byteLength(file.text, "utf8") > MAX_TEXT_ATTACHMENT_BYTES) throw new Error(`Text attachment ${name} exceeds 200KB`);
     content.push({
       type: "text",
-      text: `Attached file: ${file.name} (${file.mimeType ?? "text/plain"})\n\n\`\`\`\n${file.text}\n\`\`\``,
+      text: `Attached file: ${name} (${mimeType})\n\n\`\`\`\n${file.text}\n\`\`\``,
     });
   }
   for (const image of images ?? []) {
     if (!image?.data || !image?.mimeType) continue;
+    const name = cleanAttachmentName(image.name ?? "image");
+    const mimeType = cleanMimeType(image.mimeType);
+    if (!mimeType.startsWith("image/")) throw new Error(`Invalid image attachment: ${name}`);
+    const data = decodeBase64Attachment(name, image.data);
+    if (!isSupportedImageBytes(mimeType, data)) throw new Error(`Invalid image attachment: ${name}`);
     content.push({
       type: "image",
-      data: image.data,
-      mimeType: image.mimeType,
+      data: data.toString("base64"),
+      mimeType,
     });
   }
   return content.length === 1 && content[0].type === "text" ? content[0].text : content;
@@ -264,12 +335,7 @@ function attachServerHandlers(server: WebSocketServer, config: RemoteConfig, ctx
       return;
     }
 
-    send(ws, {
-      type: "hello",
-      server: "pi-remote-control",
-      protocolVersion: 1,
-      state: publicState(),
-    });
+    send(ws, remoteHello(publicState()));
     send(ws, { type: "history", messages: recentMessages(50), state: publicState() });
     broadcast({ type: "client_count", count: wss?.clients.size ?? 0 });
 
@@ -311,7 +377,7 @@ function startServer(ctx: ExtensionContext) {
   }
 
   const tryPort = (port: number, attemptsLeft: number) => {
-    const server = new WebSocketServer({ host: config.host, port });
+    const server = new WebSocketServer({ host: config.host, port, maxPayload: REMOTE_CONTROL_MAX_PAYLOAD });
     let settled = false;
 
     server.once("listening", () => {
