@@ -4,18 +4,6 @@
 
 It is built for the “I stepped away from my laptop but Pi is still working” workflow: watch output, send prompts, steer the current run, attach files/images, switch between live Pi sessions, and abort safely — without starting a separate headless agent.
 
-<p align="center">
-  <img src="docs/screenshots/composer-attachment.png" alt="Typing a prompt with an image attached" width="32%" />
-  <img src="docs/screenshots/menu.png" alt="Header menu with session and copy actions" width="32%" />
-  <img src="docs/screenshots/sessions.png" alt="Session picker with multiple Pi sessions" width="32%" />
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/settings.png" alt="Connection and app settings" width="32%" />
-  <img src="docs/screenshots/sessions-loading.png" alt="Scanning nearby Pi sessions" width="32%" />
-  <img src="docs/screenshots/main.png" alt="Idle or waiting state" width="32%" />
-</p>
-
 ## Highlights
 
 - **Controls existing Pi TUI sessions** — not a separate RPC/headless session.
