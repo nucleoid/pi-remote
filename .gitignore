@@ -1,0 +1,24 @@
+# Android / Gradle
+.gradle/
+.gradle-local/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Pi Remote local secrets/config
+remote-control.json
+*.token
+
+# Node deps for extension
+node_modules/
+
+# Generated screenshots outside docs
+/e2e-*.png
+/piremote-current.png
