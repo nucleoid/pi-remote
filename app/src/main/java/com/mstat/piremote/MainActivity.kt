@@ -636,6 +636,14 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                 StatusPanel(status = status, connected = connected, working = working, sessionInfo = sessionInfo)
 
                 if (!keyboardVisible && (!connected || showSettings)) {
+                    if (connected && showSettings) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            FilledTonalButton(onClick = { showSettings = false }) { Text("Done") }
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(host, { host = it }, label = { Text("Host") }, modifier = Modifier.weight(1f), singleLine = true)
                         OutlinedTextField(port, { port = it }, label = { Text("Port") }, modifier = Modifier.width(100.dp), singleLine = true)
