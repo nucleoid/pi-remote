@@ -5,9 +5,15 @@
 It is built for the “I stepped away from my laptop but Pi is still working” workflow: watch output, send prompts, steer the current run, attach files/images, switch between live Pi sessions, and abort safely — without starting a separate headless agent.
 
 <p align="center">
-  <img src="docs/screenshots/main.png" alt="π Remote main screen" width="32%" />
-  <img src="docs/screenshots/sessions-loading.png" alt="π Remote scanning sessions" width="32%" />
-  <img src="docs/screenshots/sessions.png" alt="π Remote session picker" width="32%" />
+  <img src="docs/screenshots/composer-attachment.png" alt="Typing a prompt with an image attached" width="32%" />
+  <img src="docs/screenshots/menu.png" alt="Header menu with session and copy actions" width="32%" />
+  <img src="docs/screenshots/sessions.png" alt="Session picker with multiple Pi sessions" width="32%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings.png" alt="Connection and app settings" width="32%" />
+  <img src="docs/screenshots/sessions-loading.png" alt="Scanning nearby Pi sessions" width="32%" />
+  <img src="docs/screenshots/main.png" alt="Idle or waiting state" width="32%" />
 </p>
 
 ## Highlights
@@ -15,7 +21,7 @@ It is built for the “I stepped away from my laptop but Pi is still working” 
 - **Controls existing Pi TUI sessions** — not a separate RPC/headless session.
 - **Android app + Pi extension** using authenticated WebSockets.
 - **Live output streaming** for assistant text and tool events.
-- **Prompt / Ask, Steer, Follow-up, Abort** from your phone.
+- **Ask, Steer, Follow, Abort** from your phone.
 - **File and image attachments** from Android share sheets or the app picker.
 - **Session picker** scans nearby Pi Remote ports and lets you switch between multiple active Pi sessions.
 - **QR/deep-link connection flow** for easy setup.
@@ -125,10 +131,17 @@ For cellular/external access, install Tailscale on both laptop and phone, then u
 
 ### Composer
 
-- `Send` submits using the selected mode.
-- Mode selector: `Ask`, `Steer`, `Follow`.
-- Attach files/images with `+ File`.
-- Abort requires confirmation.
+The composer has three send modes. Pick a mode, type your text, then tap **Send**.
+
+- **Ask** — send a normal user prompt. If Pi is idle, this starts a new assistant run. If Pi is already working, the extension delivers it using Pi’s default in-flight behavior.
+- **Steer** — inject guidance into the currently-running response. Use this when Pi is mid-run and you want to redirect style, scope, priorities, or constraints without waiting.
+- **Follow** — queue a follow-up message for after the current assistant turn finishes. Use this when you want Pi to finish what it is doing, then immediately continue with your next instruction.
+
+Other composer controls:
+
+- **+ File** attaches files/images from Android.
+- **Abort** stops the active Pi run after confirmation.
+- Long-press messages to copy them; the menu also has **Copy latest response**.
 
 ### Sessions
 
@@ -143,6 +156,16 @@ Android share targets are supported:
 - share text into the message box
 - share images/files as attachments
 - optional auto-send shared content setting
+
+## Screenshot gallery
+
+| Composer with image | Header menu | Settings |
+| --- | --- | --- |
+| <img src="docs/screenshots/composer-attachment.png" alt="Composer with attached image" width="220" /> | <img src="docs/screenshots/menu.png" alt="Header menu" width="220" /> | <img src="docs/screenshots/settings.png" alt="Settings screen" width="220" /> |
+
+| Session scan | Session picker | Waiting state |
+| --- | --- | --- |
+| <img src="docs/screenshots/sessions-loading.png" alt="Scanning sessions" width="220" /> | <img src="docs/screenshots/sessions.png" alt="Session picker" width="220" /> | <img src="docs/screenshots/main.png" alt="Waiting state" width="220" /> |
 
 ## Extension protocol
 
