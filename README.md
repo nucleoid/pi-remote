@@ -1,63 +1,74 @@
 # π Remote
 
-**π Remote** is a dev-only Android companion app for controlling an existing, visible [Pi](https://github.com/earendil-works/pi-coding-agent) TUI session from your phone.
+**π Remote** is an Android companion app plus Pi extension for controlling an existing, visible [Pi](https://github.com/earendil-works/pi-coding-agent) TUI session from your phone.
 
-It is built for the “I stepped away from my laptop but Pi is still working” workflow: watch output, send prompts, steer the current run, attach files/images, switch between live Pi sessions, and abort safely — without starting a separate headless agent.
+It is a developer tool, **not a hardened public service**. Do not expose the WebSocket port to the public internet.
 
-## Highlights
+## Install
 
-- **Controls existing Pi TUI sessions** — not a separate RPC/headless session.
-- **Android app + Pi extension** using authenticated WebSockets.
-- **Live output streaming** for assistant text and tool events.
-- **Ask, Steer, Follow, Abort** from your phone.
-- **File and image attachments** from Android share sheets or the app picker.
-- **Session picker** scans nearby Pi Remote ports and lets you switch between multiple active Pi sessions.
-- **QR/deep-link connection flow** for easy setup.
-- **Tailscale-friendly** for external/cellular access without exposing a public port.
-- **Polished dev UI**: dark-green theme, compact composer, safe abort confirmation, haptics, copy latest response, keep-awake option.
+### Pi extension
 
-## Repository layout
+Primary catalog path:
 
-```text
-.
-├── app/                         # Android app: Kotlin + Jetpack Compose
-├── pi-extension/remote-control/ # Pi TypeScript extension
-├── docs/screenshots/            # README screenshots
-├── gradlew / gradlew.bat        # Gradle wrapper
-└── README.md
+```bash
+pi install npm:@nucleoid/pi-remote-control
 ```
+
+Git/local install paths:
+
+```bash
+pi install git:github.com/nucleoid/pi-remote
+pi install ./pi-extension/remote-control
+```
+
+### Android app
+
+Install the signed release APK from the latest GitHub Release. If no release APK is available for your platform yet, build from source:
+
+```bash
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Play Store and F-Droid distribution are not available yet.
 
 ## Security model
 
-This is intentionally a **developer tool**, not a hardened public service.
+Read [SECURITY.md](SECURITY.md) before using π Remote.
 
-The Pi extension:
+- Use LAN, Tailscale, WireGuard, localhost, or an SSH tunnel.
+- Do **not** router-port-forward or publicly expose the WebSocket port.
+- The protocol uses cleartext `ws://` intentionally for LAN/VPN/tunnel use; protect the transport with your network.
+- Treat tokens, QR codes, and `pi-remote://` deep links as secrets.
+- Run `/remote-control-rotate-token` if pairing material leaks.
+- Android stores connection settings in encrypted preferences and disables Android backups.
 
-- listens only when Pi is running in TUI mode
-- requires an auth token by default
-- supports binding to `127.0.0.1` or `0.0.0.0`
-- auto-increments ports if the configured port is already busy
+## Pairing and commands
 
-For off-LAN usage, prefer **Tailscale** over router port forwarding. Avoid exposing the WebSocket port directly to the public internet.
-
-## Install the Pi extension
-
-Copy or symlink the extension into your Pi agent extensions directory:
-
-```powershell
-mkdir $env:USERPROFILE\.pi\agent\extensions\remote-control
-copy pi-extension\remote-control\* $env:USERPROFILE\.pi\agent\extensions\remote-control\
-cd $env:USERPROFILE\.pi\agent\extensions\remote-control
-npm install
-```
-
-Create or edit:
+In Pi TUI mode:
 
 ```text
-~/.pi/agent/remote-control.json
+/remote-control
 ```
 
-Example for Android over LAN/Tailscale:
+This safe status output redacts token-bearing URLs by default. Use explicit pairing commands only when you are ready to show secret material:
+
+```text
+/remote-control-qr
+/remote-control-android
+```
+
+Management commands:
+
+```text
+/remote-control-rotate-token
+/remote-control-disable
+/remote-control-enable
+```
+
+## Configuration
+
+`~/.pi/agent/remote-control.json`:
 
 ```json
 {
@@ -65,87 +76,41 @@ Example for Android over LAN/Tailscale:
   "host": "0.0.0.0",
   "port": 37891,
   "allowNoAuthFromLoopback": false,
-  "token": "replace-with-a-long-random-token"
+  "maxClients": 3,
+  "failedAuthLimit": 8,
+  "failedAuthWindowMs": 60000,
+  "token": "generated-secret"
 }
 ```
 
-Reload Pi:
+`allowNoAuthFromLoopback` defaults to `false`, is warned when enabled, and never applies to LAN/Tailscale/public addresses.
 
-```text
-/reload
-```
+## Compatibility
 
-Then show connection info:
+| Component | Requirement |
+| --- | --- |
+| Pi | Current Pi coding agent with extension support |
+| Android | min SDK 26 / Android 8.0+ |
+| Node/npm | Node 22 recommended for extension development |
 
-```text
-/remote-control
-/remote-control-qr
-/remote-control-android
-```
+## Troubleshooting
 
-## Build/install the Android app
+- Cannot connect: confirm Pi is in TUI mode, the extension is enabled, and host/port match.
+- LAN vs Tailscale confusion: use the laptop's LAN IP on LAN, or its Tailscale IP/name over Tailscale.
+- Token mismatch: re-pair or rotate with `/remote-control-rotate-token`.
+- Firewall: allow the configured port on trusted LAN/VPN only.
+- Multiple sessions: each Pi TUI may use a different port if the default is busy.
 
-From the repo root:
-
-```bash
-./gradlew assembleDebug
-```
-
-Install with ADB:
+## Uninstall
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+pi uninstall @nucleoid/pi-remote-control
+adb uninstall com.mstat.piremote
 ```
-
-The app label is **`pi remote`** for easy launcher/search discovery. The in-app brand uses **`π Remote`**.
-
-## Connecting
-
-In the target Pi TUI session, run:
-
-```text
-/remote-control
-```
-
-Then use one of:
-
-- scan the QR code with **Scan QR** in app settings
-- open the generated `pi-remote://...` deep link
-- enter host/port/token manually
-
-For cellular/external access, install Tailscale on both laptop and phone, then use the laptop’s Tailscale IP as the host.
-
-## Android features
-
-### Composer
-
-The composer has three send modes. Pick a mode, type your text, then tap **Send**.
-
-- **Ask** — send a normal user prompt. If Pi is idle, this starts a new assistant run. If Pi is already working, the extension delivers it using Pi’s default in-flight behavior.
-- **Steer** — inject guidance into the currently-running response. Use this when Pi is mid-run and you want to redirect style, scope, priorities, or constraints without waiting.
-- **Follow** — queue a follow-up message for after the current assistant turn finishes. Use this when you want Pi to finish what it is doing, then immediately continue with your next instruction.
-
-Other composer controls:
-
-- **+ File** attaches files/images from Android.
-- **Abort** stops the active Pi run after confirmation.
-- Long-press messages to copy them; the menu also has **Copy latest response**.
-
-### Sessions
-
-Use the header menu → **Sessions**.
-
-The app scans nearby ports and shows matching Pi sessions, including whether they are idle or working. This avoids accidentally connecting to an old/stale Pi process.
-
-### Sharing into π Remote
-
-Android share targets are supported:
-
-- share text into the message box
-- share images/files as attachments, including PDFs/documents as file attachments instead of inline binary text
-- optional auto-send shared content setting
 
 ## Screenshot gallery
+
+All screenshots use demo-safe data only.
 
 | Composer with image | Header menu | Settings |
 | --- | --- | --- |
@@ -155,53 +120,11 @@ Android share targets are supported:
 | --- | --- | --- |
 | <img src="docs/screenshots/sessions-loading.png" alt="Scanning sessions" width="220" /> | <img src="docs/screenshots/sessions.png" alt="Session picker" width="220" /> | <img src="docs/screenshots/main.png" alt="Waiting state" width="220" /> |
 
-## Extension protocol
+## Development
 
-The extension exposes an authenticated WebSocket server.
-
-Commands include:
-
-```json
-{ "type": "prompt", "text": "Review the current changes" }
-{ "type": "steer", "text": "Focus on tests" }
-{ "type": "follow_up", "text": "Then summarize" }
-{ "type": "abort" }
-{ "type": "get_state" }
-{ "type": "get_history", "limit": 50 }
-{ "type": "ping" }
+```bash
+./gradlew test assembleDebug
+cd pi-extension/remote-control && npm test && npm run typecheck && npm pack --dry-run
 ```
 
-Prompt, steer, and follow-up commands can include attachments:
-
-- `images[]`: `{ "name": "photo.png", "mimeType": "image/png", "data": "<base64>" }`
-- `files[]` text: `{ "name": "notes.txt", "mimeType": "text/plain", "text": "..." }`
-- `files[]` binary/PDF: `{ "name": "spec.pdf", "mimeType": "application/pdf", "encoding": "base64", "data": "<base64>" }`
-
-The extension advertises binary-document support in `hello.capabilities.binaryFileAttachments`, validates binary attachments, and never dumps base64/PDF bytes into the prompt content.
-
-Events include:
-
-- `hello`
-- `history`
-- `user_message`
-- `assistant_delta`
-- `assistant_message`
-- `tool_start`
-- `tool_update`
-- `tool_end`
-- `agent_start`
-- `agent_end`
-- `queue_update`
-- `session_start`
-- `session_shutdown`
-- `response`
-
-## Development notes
-
-- Android: Kotlin, Jetpack Compose, OkHttp WebSocket, ZXing QR scanner.
-- Pi extension: TypeScript, `ws`, `qrcode-terminal`.
-- Tested on a Pixel 9 Pro over USB, Wi-Fi, and Tailscale/cellular.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Release APKs are signed with keystore/passwords supplied outside git through `local.properties` or protected GitHub Actions secrets.

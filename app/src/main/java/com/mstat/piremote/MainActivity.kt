@@ -168,7 +168,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val density = LocalDensity.current
-    val prefs = remember { context.getSharedPreferences("pi-remote", Context.MODE_PRIVATE) }
+    val prefs = remember { securePiRemotePreferences(context) }
 
     var host by remember { mutableStateOf(prefs.getString("host", "192.168.1.") ?: "192.168.1.") }
     var port by remember { mutableStateOf(prefs.getString("port", "37891") ?: "37891") }

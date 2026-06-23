@@ -1,0 +1,31 @@
+{
+  "name": "pi-remote",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Repo-root Pi package metadata for installing the π Remote Pi extension from git/local paths.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nucleoid/pi-remote.git"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "remote-control",
+    "android"
+  ],
+  "pi": {
+    "extensions": [
+      "./pi-extension/remote-control/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/nucleoid/pi-remote/main/docs/screenshots/main.png"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
