@@ -1,4 +1,4 @@
-package com.mstat.piremote
+package com.pragmaticcoder.piremote
 
 import android.content.ClipData
 import android.content.ClipboardManager

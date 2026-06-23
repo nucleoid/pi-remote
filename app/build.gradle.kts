@@ -15,15 +15,15 @@ fun secret(name: String): String? =
     localProperties.getProperty(name) ?: System.getenv(name)
 
 android {
-    namespace = "com.mstat.piremote"
+    namespace = "com.pragmaticcoder.piremote"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.mstat.piremote"
+        applicationId = "com.pragmaticcoder.piremote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     signingConfigs {

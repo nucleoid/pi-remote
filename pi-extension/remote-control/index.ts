@@ -628,7 +628,7 @@ export default function remoteControl(pi: ExtensionAPI) {
           ctx.ui.notify(`No authorized Android device found.\n\n${devices.stdout.trim() || devices.stderr.trim()}`, "warning");
           return;
         }
-        await runAdb(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", link, "com.mstat.piremote"]);
+        await runAdb(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", link, "com.pragmaticcoder.piremote"]);
         ctx.ui.notify(pairingWarningLines(`Opened Pi Remote on Android.\n${link}`).join("\n"), "warning");
       } catch (error: any) {
         ctx.ui.notify(pairingWarningLines(`Failed to open Android app via adb:\n${error?.message ?? String(error)}\n\nDeep link:\n${link}`).join("\n"), "error");

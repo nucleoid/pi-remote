@@ -105,7 +105,7 @@ Management commands:
 
 ```bash
 pi uninstall @nucleoid/pi-remote-control
-adb uninstall com.mstat.piremote
+adb uninstall com.pragmaticcoder.piremote
 ```
 
 ## Screenshot gallery

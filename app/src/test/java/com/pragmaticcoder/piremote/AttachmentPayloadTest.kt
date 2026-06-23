@@ -1,4 +1,4 @@
-package com.mstat.piremote
+package com.pragmaticcoder.piremote
 
 import org.junit.Assert.*
 import org.junit.Test
