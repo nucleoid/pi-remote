@@ -33,7 +33,11 @@ jobs:
           PI_REMOTE_RELEASE_KEY_ALIAS: ${{ secrets.PI_REMOTE_RELEASE_KEY_ALIAS }}
           PI_REMOTE_RELEASE_KEY_PASSWORD: ${{ secrets.PI_REMOTE_RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
-      - name: Attach APK to GitHub Release
+      - name: Generate checksums
+        run: |
+          cd app/build/outputs/apk/release
+          sha256sum app-release.apk > SHA256SUMS.txt
+      - name: Attach APK and checksums to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -41,4 +45,7 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" --verify-tag --title "$tag" --notes "π Remote $tag"
           fi
-          gh release upload "$tag" app/build/outputs/apk/release/app-release.apk --clobber
+          gh release upload "$tag" \
+            app/build/outputs/apk/release/app-release.apk \
+            app/build/outputs/apk/release/SHA256SUMS.txt \
+            --clobber

@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "description": "Repo-root Pi package metadata for installing the π Remote Pi extension from git/local paths.",
   "license": "MIT",
+  "author": "pragmaticcoder.com",
+  "homepage": "https://github.com/nucleoid/pi-remote#readme",
+  "bugs": {
+    "url": "https://github.com/nucleoid/pi-remote/issues"
+  },
   "type": "module",
   "repository": {
     "type": "git",
@@ -12,8 +17,15 @@
   "keywords": [
     "pi-package",
     "pi",
+    "pi-extension",
+    "pi-coding-agent",
     "remote-control",
-    "android"
+    "android",
+    "android-companion",
+    "tui",
+    "developer-tools",
+    "tailscale",
+    "wireguard"
   ],
   "pi": {
     "extensions": [

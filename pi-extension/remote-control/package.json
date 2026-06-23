@@ -1,8 +1,13 @@
 {
   "name": "@pragmaticcoder/pi-remote-control",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi extension for securely pairing the π Remote Android companion app with an active Pi TUI session.",
   "license": "MIT",
+  "author": "pragmaticcoder.com",
+  "homepage": "https://github.com/nucleoid/pi-remote#readme",
+  "bugs": {
+    "url": "https://github.com/nucleoid/pi-remote/issues"
+  },
   "type": "module",
   "repository": {
     "type": "git",
@@ -12,9 +17,15 @@
   "keywords": [
     "pi-package",
     "pi",
+    "pi-extension",
+    "pi-coding-agent",
     "remote-control",
     "android",
-    "tui"
+    "android-companion",
+    "tui",
+    "developer-tools",
+    "tailscale",
+    "wireguard"
   ],
   "pi": {
     "extensions": [

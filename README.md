@@ -1,5 +1,10 @@
 # π Remote
 
+[![CI](https://github.com/nucleoid/pi-remote/actions/workflows/ci.yml/badge.svg)](https://github.com/nucleoid/pi-remote/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@pragmaticcoder/pi-remote-control.svg)](https://www.npmjs.com/package/@pragmaticcoder/pi-remote-control)
+[![GitHub Release](https://img.shields.io/github/v/release/nucleoid/pi-remote)](https://github.com/nucleoid/pi-remote/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **π Remote** is an Android companion app plus Pi extension for controlling an existing, visible [Pi](https://github.com/earendil-works/pi-coding-agent) TUI session from your phone.
 
 It is a developer tool, **not a hardened public service**. Do not expose the WebSocket port to the public internet.
@@ -10,11 +15,25 @@ It is a developer tool, **not a hardened public service**. Do not expose the Web
 
 This release is intended for trusted personal networks, VPNs, and local tunnels. Please read the security model before pairing a phone with a Pi session.
 
+## Quick start
+
+1. Install the Pi extension:
+
+   ```bash
+   pi install npm:@pragmaticcoder/pi-remote-control
+   ```
+
+2. Start Pi in TUI mode on your computer.
+3. Run `/remote-control-qr` in Pi and scan the QR code from Android.
+4. Install the signed APK from the latest GitHub Release.
+
+See [docs/INSTALL.md](docs/INSTALL.md) for detailed install and verification steps.
+
 ## Install
 
 ### Pi extension
 
-Primary catalog path:
+Primary npm / Pi package catalog path:
 
 ```bash
 pi install npm:@pragmaticcoder/pi-remote-control
@@ -29,7 +48,15 @@ pi install ./pi-extension/remote-control
 
 ### Android app
 
-Install the signed release APK from the latest GitHub Release. If no release APK is available for your platform yet, build from source:
+Install the signed release APK from the latest GitHub Release. Verify `app-release.apk` against the release SHA-256 or `SHA256SUMS.txt` asset when available:
+
+```bash
+sha256sum app-release.apk
+```
+
+Google Play Protect may warn that it has not seen this developer before. That is expected for a new GitHub-distributed APK that is not distributed through Google Play. Only install APKs from the official GitHub Releases page.
+
+If no release APK is available for your platform yet, build from source:
 
 ```bash
 ./gradlew assembleDebug
@@ -40,7 +67,7 @@ Play Store and F-Droid distribution are not available yet.
 
 ## Security model
 
-Read [SECURITY.md](SECURITY.md) before using π Remote.
+Read [SECURITY.md](SECURITY.md) and [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) before using π Remote.
 
 - Use LAN, Tailscale, WireGuard, localhost, or an SSH tunnel.
 - Do **not** router-port-forward or publicly expose the WebSocket port.
@@ -91,6 +118,19 @@ Management commands:
 
 `allowNoAuthFromLoopback` defaults to `false`, is warned when enabled, and never applies to LAN/Tailscale/public addresses.
 
+## Pi package catalog
+
+The Pi extension is published to npm as `@pragmaticcoder/pi-remote-control` with the `pi-package` keyword and Pi package manifest metadata. After the repository is public, it should be discoverable through [pi.dev/packages](https://pi.dev/packages).
+
+## More docs
+
+- [Install guide](docs/INSTALL.md)
+- [Security model](docs/SECURITY-MODEL.md)
+- [Networking recipes](docs/NETWORKING.md)
+- [Development guide](docs/DEVELOPMENT.md)
+- [Support](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
+
 ## Compatibility
 
 | Component | Requirement |
@@ -98,6 +138,12 @@ Management commands:
 | Pi | Current Pi coding agent with extension support |
 | Android | min SDK 26 / Android 8.0+ |
 | Node/npm | Node 22 recommended for extension development |
+
+## Known limitations
+
+- GitHub Releases are the Android distribution path for now; Play Store and F-Droid distribution are not available yet.
+- The protocol intentionally uses cleartext `ws://` for trusted LAN/VPN/tunnel use rather than internet-facing TLS.
+- π Remote controls an existing visible Pi TUI session; it is not a hosted/headless Pi service.
 
 ## Troubleshooting
 

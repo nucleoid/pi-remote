@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security policy
+    url: https://github.com/nucleoid/pi-remote/security/policy
+    about: Please do not report vulnerabilities or token leaks in public issues.
+  - name: Support guide
+    url: https://github.com/nucleoid/pi-remote/blob/main/SUPPORT.md
+    about: Read this before opening usage questions or sharing logs/screenshots.

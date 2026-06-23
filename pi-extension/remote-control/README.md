@@ -2,6 +2,8 @@
 
 Pi extension for pairing the π Remote Android app with an active Pi TUI session.
 
+This npm package is a Pi package (`pi-package`) and should be discoverable through [pi.dev/packages](https://pi.dev/packages) after the repository is public.
+
 ## Install
 
 ```bash
@@ -27,6 +29,8 @@ pi install git:github.com/nucleoid/pi-remote
 ## Security
 
 Do not expose the WebSocket port to the public internet. Use LAN, Tailscale/WireGuard, localhost, or SSH tunnels. `ws://` is cleartext by design for LAN/VPN use, so protect the network path. Treat tokens, QR codes, and `pi-remote://` links as secrets and rotate the token after any leak.
+
+See the repository [security model](https://github.com/nucleoid/pi-remote/blob/main/docs/SECURITY-MODEL.md) for details.
 
 Configuration is stored at `~/.pi/agent/remote-control.json` with best-effort restrictive permissions. `allowNoAuthFromLoopback` defaults to `false`; if enabled it is warned in status and applies only to loopback addresses.
 
