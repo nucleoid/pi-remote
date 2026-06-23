@@ -4,6 +4,12 @@
 
 It is a developer tool, **not a hardened public service**. Do not expose the WebSocket port to the public internet.
 
+## First public release
+
+π Remote is now available as an early public release for developers who want to monitor and steer an existing Pi TUI session from Android. The Pi extension is published as `@pragmaticcoder/pi-remote-control`, and the Android app is distributed as a signed APK on GitHub Releases.
+
+This release is intended for trusted personal networks, VPNs, and local tunnels. Please read the security model before pairing a phone with a Pi session.
+
 ## Install
 
 ### Pi extension
