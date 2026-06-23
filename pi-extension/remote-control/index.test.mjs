@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildUserContent, remoteHello, REMOTE_CONTROL_MAX_PAYLOAD } from './index.ts';
+import {
+  buildUserContent,
+  remoteHello,
+  REMOTE_CONTROL_MAX_PAYLOAD,
+  redactedStatusLines,
+  pairingWarningLines,
+  authenticateRequest,
+  createAuthLimiter,
+  authenticatedClientCount,
+} from './index.ts';
+
+const config = {
+  enabled: true,
+  host: '0.0.0.0',
+  port: 37891,
+  token: 'super-secret-token',
+  allowNoAuthFromLoopback: false,
+  maxClients: 1,
+  failedAuthLimit: 2,
+  failedAuthWindowMs: 60_000,
+};
 
 test('binary files are represented as attachment metadata without dumping bytes', () => {
   const content = buildUserContent('please inspect', [], [
@@ -45,4 +65,53 @@ test('hello advertises binary file attachment capability', () => {
 test('websocket payload cap leaves room for four bounded binary attachments', () => {
   assert.ok(REMOTE_CONTROL_MAX_PAYLOAD >= 28 * 1024 * 1024);
   assert.ok(REMOTE_CONTROL_MAX_PAYLOAD < 40 * 1024 * 1024);
+});
+
+test('status output is redacted by default and exposes loopback bypass state', () => {
+  const lines = redactedStatusLines(config, '100.64.0.10', 37891, '/tmp/remote-control.json');
+  const text = lines.join('\n');
+  assert.match(text, /WebSocket: ws:\/\/100\.64\.0\.10:37891\?token=\[redacted\]/);
+  assert.match(text, /Android deep link: pi-remote:\/\/100\.64\.0\.10:37891\?token=\[redacted\]/);
+  assert.match(text, /Loopback no-auth bypass: disabled/);
+  assert.doesNotMatch(text, /super-secret-token/);
+});
+
+test('explicit pairing output includes warning and token-bearing material', () => {
+  const lines = pairingWarningLines('pi-remote://100.64.0.10:37891?token=super-secret-token');
+  const text = lines.join('\n');
+  assert.match(text, /Secret pairing material/);
+  assert.match(text, /token=super-secret-token/);
+});
+
+test('authentication never allows non-loopback bypass and rate limits repeated failures', () => {
+  const limiter = createAuthLimiter(2, 60_000);
+  const req = (remoteAddress, url = '/?token=wrong') => ({ socket: { remoteAddress }, url, headers: { host: 'localhost' } });
+
+  const loopbackConfig = { ...config, allowNoAuthFromLoopback: true };
+  assert.equal(authenticateRequest(req('::1', '/'), loopbackConfig, limiter).ok, true);
+  assert.equal(authenticateRequest(req('100.64.0.22', '/'), loopbackConfig, limiter).ok, false);
+  assert.equal(authenticateRequest(req('100.64.0.23'), config, limiter).reason, 'unauthorized');
+  assert.equal(authenticateRequest(req('100.64.0.23'), config, limiter).reason, 'rate_limited');
+  assert.equal(authenticateRequest(req('100.64.0.23', '/?token=super-secret-token'), config, limiter).ok, false);
+});
+
+test('authentication treats malformed Host headers as unauthorized instead of throwing', () => {
+  const limiter = createAuthLimiter(2, 60_000);
+  const malformedHostReq = {
+    socket: { remoteAddress: '100.64.0.24' },
+    url: '/?token=wrong',
+    headers: { host: 'bad host' },
+  };
+
+  assert.doesNotThrow(() => authenticateRequest(malformedHostReq, config, limiter));
+  assert.deepEqual(authenticateRequest(malformedHostReq, config, limiter), { ok: false, reason: 'rate_limited' });
+});
+
+test('authenticated client count ignores rejected/unauthenticated sockets', () => {
+  const clients = new Set([
+    { readyState: 1, piRemoteAuthenticated: true },
+    { readyState: 1, piRemoteAuthenticated: false },
+    { readyState: 3, piRemoteAuthenticated: true },
+  ]);
+  assert.equal(authenticatedClientCount(clients), 1);
 });

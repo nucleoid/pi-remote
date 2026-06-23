@@ -1,13 +1,48 @@
 {
-  "name": "pi-remote-control-extension",
-  "private": true,
+  "name": "@nucleoid/pi-remote-control",
+  "version": "0.1.0",
+  "description": "Pi extension for securely pairing the π Remote Android companion app with an active Pi TUI session.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nucleoid/pi-remote.git",
+    "directory": "pi-extension/remote-control"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "remote-control",
+    "android",
+    "tui"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/nucleoid/pi-remote/main/docs/screenshots/main.png"
+  },
   "scripts": {
     "client": "node client.mjs",
-    "test": "node --experimental-strip-types --test index.test.mjs"
+    "test": "node --experimental-strip-types --test index.test.mjs",
+    "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "README.md",
+    "index.ts",
+    "client.mjs"
+  ],
   "dependencies": {
     "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.7.2"
   }
 }

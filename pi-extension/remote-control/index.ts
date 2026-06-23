@@ -1,7 +1,7 @@
-// @ts-nocheck
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { WebSocketServer, WebSocket } from "ws";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import type { IncomingMessage } from "node:http";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, hostname, networkInterfaces } from "node:os";
 import { randomBytes } from "node:crypto";
@@ -14,6 +14,14 @@ interface RemoteConfig {
   port: number;
   token: string;
   allowNoAuthFromLoopback: boolean;
+  maxClients: number;
+  failedAuthLimit: number;
+  failedAuthWindowMs: number;
+}
+
+interface RemoteWebSocket extends WebSocket {
+  piRemoteAuthenticated?: boolean;
+  piRemoteRevoked?: boolean;
 }
 
 const CONFIG_DIR = join(homedir(), ".pi", "agent");
@@ -24,6 +32,9 @@ const DEFAULT_CONFIG: Omit<RemoteConfig, "token"> = {
   host: "127.0.0.1",
   port: 37891,
   allowNoAuthFromLoopback: false,
+  maxClients: 3,
+  failedAuthLimit: 8,
+  failedAuthWindowMs: 60_000,
 };
 
 let wss: WebSocketServer | undefined;
@@ -40,7 +51,7 @@ function loadConfig(): RemoteConfig {
       ...DEFAULT_CONFIG,
       token: randomBytes(24).toString("base64url"),
     };
-    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf8");
+    writeConfig(config);
     return config;
   }
 
@@ -52,8 +63,19 @@ function loadConfig(): RemoteConfig {
   };
 
   // Persist migrations/defaulted fields.
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf8");
+  writeConfig(config);
   return config;
+}
+
+function writeConfig(config: RemoteConfig) {
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  try {
+    chmodSync(CONFIG_DIR, 0o700);
+    chmodSync(CONFIG_PATH, 0o600);
+  } catch {
+    // Best-effort on filesystems/platforms that do not support POSIX modes.
+  }
 }
 
 function send(ws: WebSocket, message: unknown) {
@@ -75,7 +97,7 @@ function getLanAddress(): string | undefined {
   const candidates: Array<{ name: string; address: string; cidr?: string }> = [];
   for (const [name, entries] of Object.entries(interfaces)) {
     for (const entry of entries ?? []) {
-      if (entry.family === "IPv4" && !entry.internal) candidates.push({ name, address: entry.address, cidr: entry.cidr });
+      if (entry.family === "IPv4" && !entry.internal) candidates.push({ name, address: entry.address, cidr: entry.cidr ?? undefined });
     }
   }
 
@@ -105,6 +127,38 @@ function webSocketUrl(config: RemoteConfig): string {
 function deepLinkUrl(config: RemoteConfig): string {
   const host = connectionHost(config);
   return `pi-remote://${host}:${currentPort ?? config.port}?token=${encodeURIComponent(config.token)}`;
+}
+
+function redactedWebSocketUrl(host: string, port: number): string {
+  return `ws://${host}:${port}?token=[redacted]`;
+}
+
+function redactedDeepLinkUrl(host: string, port: number): string {
+  return `pi-remote://${host}:${port}?token=[redacted]`;
+}
+
+export function redactedStatusLines(config: RemoteConfig, host = connectionHost(config), port = currentPort ?? config.port, configPath = CONFIG_PATH): string[] {
+  const lines = [
+    `Remote control: ${config.enabled ? "enabled" : "disabled"}`,
+    `WebSocket: ${redactedWebSocketUrl(host, port)}`,
+    `Android deep link: ${redactedDeepLinkUrl(host, port)}`,
+    `Authenticated clients: ${wss ? authenticatedClientCount(wss.clients) : 0}/${config.maxClients}`,
+    `Failed-auth limit: ${config.failedAuthLimit} per ${Math.round(config.failedAuthWindowMs / 1000)}s per remote address`,
+    `Loopback no-auth bypass: ${config.allowNoAuthFromLoopback ? "ENABLED (unsafe; loopback only)" : "disabled"}`,
+    `Pairing QR/deep link: run /remote-control-qr or /remote-control-android`,
+    `Config: ${configPath}`,
+    `For Android over LAN/Tailscale, set host to "0.0.0.0" and restart or /reload.`,
+  ];
+  if (config.allowNoAuthFromLoopback) lines.splice(1, 0, "WARNING: loopback no-auth bypass is enabled for local clients only.");
+  return lines;
+}
+
+export function pairingWarningLines(secretMaterial: string): string[] {
+  return [
+    "WARNING: Secret pairing material follows. Anyone who can see this QR/deep link/token can control this Pi session until you rotate the token.",
+    "Do not paste it into public issues, logs, screenshots, or chat.",
+    secretMaterial,
+  ];
 }
 
 function findAdb(): string {
@@ -161,16 +215,74 @@ function publicState() {
   };
 }
 
-function authenticate(req: any, config: RemoteConfig): boolean {
-  const remoteAddress = req.socket?.remoteAddress ?? "";
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+function remoteAddressOf(req: IncomingMessage): string {
+  return req.socket?.remoteAddress ?? "unknown";
+}
+
+function isLoopbackAddress(remoteAddress: string): boolean {
+  return remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1";
+}
+
+export function createAuthLimiter(limit: number, windowMs: number) {
+  const attempts = new Map<string, { count: number; resetAt: number }>();
+  return {
+    recordFailure(remoteAddress: string, now = Date.now()): boolean {
+      const current = attempts.get(remoteAddress);
+      if (!current || current.resetAt <= now) {
+        attempts.set(remoteAddress, { count: 1, resetAt: now + windowMs });
+        return false;
+      }
+      current.count += 1;
+      return current.count >= limit;
+    },
+    isLimited(remoteAddress: string, now = Date.now()): boolean {
+      const current = attempts.get(remoteAddress);
+      return !!current && current.resetAt > now && current.count >= limit;
+    },
+    clear(remoteAddress: string) {
+      attempts.delete(remoteAddress);
+    },
+  };
+}
+
+type AuthLimiter = ReturnType<typeof createAuthLimiter>;
+
+let authLimiter: AuthLimiter | undefined;
+
+export function authenticateRequest(req: Pick<IncomingMessage, "url" | "headers" | "socket">, config: RemoteConfig, limiter: AuthLimiter): { ok: boolean; reason?: "unauthorized" | "rate_limited" } {
+  const remoteAddress = req.socket?.remoteAddress ?? "unknown";
+  if (limiter.isLimited(remoteAddress)) return { ok: false, reason: "rate_limited" };
+
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", "http://localhost");
+  } catch {
+    const limited = limiter.recordFailure(remoteAddress);
+    return { ok: false, reason: limited ? "rate_limited" : "unauthorized" };
+  }
   const queryToken = url.searchParams.get("token");
   const auth = req.headers.authorization;
   const bearer = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : undefined;
 
-  const isLoopback = remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1";
-  if (config.allowNoAuthFromLoopback && isLoopback) return true;
-  return queryToken === config.token || bearer === config.token;
+  if (config.allowNoAuthFromLoopback && isLoopbackAddress(remoteAddress)) {
+    limiter.clear(remoteAddress);
+    return { ok: true };
+  }
+  if (queryToken === config.token || bearer === config.token) {
+    limiter.clear(remoteAddress);
+    return { ok: true };
+  }
+
+  const limited = limiter.recordFailure(remoteAddress);
+  return { ok: false, reason: limited ? "rate_limited" : "unauthorized" };
+}
+
+export function authenticatedClientCount(clients: Iterable<WebSocket | RemoteWebSocket>): number {
+  let count = 0;
+  for (const client of clients) {
+    if (client.readyState === WebSocket.OPEN && (client as RemoteWebSocket).piRemoteAuthenticated) count += 1;
+  }
+  return count;
 }
 
 const MAX_BINARY_ATTACHMENT_BYTES = 5 * 1024 * 1024;
@@ -328,18 +440,39 @@ async function handleCommand(ws: WebSocket, raw: any) {
 let piApi: ExtensionAPI | undefined;
 
 function attachServerHandlers(server: WebSocketServer, config: RemoteConfig, ctx: ExtensionContext) {
-  server.on("connection", (ws, req) => {
-    if (!authenticate(req, config)) {
-      send(ws, { type: "error", error: "unauthorized" });
-      ws.close(1008, "unauthorized");
+  authLimiter = createAuthLimiter(config.failedAuthLimit, config.failedAuthWindowMs);
+  server.on("connection", (ws: RemoteWebSocket, req) => {
+    const liveConfig = currentConfig ?? config;
+    let auth: ReturnType<typeof authenticateRequest>;
+    try {
+      auth = authenticateRequest(req, liveConfig, authLimiter!);
+    } catch {
+      auth = { ok: false, reason: "unauthorized" };
+    }
+    if (!auth.ok) {
+      ctx.ui.notify(`Rejected remote-control connection from ${remoteAddressOf(req)}: ${auth.reason === "rate_limited" ? "rate limited" : "unauthorized"}. Token value was not logged.`, auth.reason === "rate_limited" ? "warning" : "info");
+      send(ws, { type: "error", error: auth.reason });
+      ws.close(1008, auth.reason);
       return;
     }
 
+    if (authenticatedClientCount(server.clients) >= liveConfig.maxClients) {
+      ctx.ui.notify(`Rejected remote-control connection from ${remoteAddressOf(req)}: max authenticated clients reached.`, "warning");
+      send(ws, { type: "error", error: "too_many_clients" });
+      ws.close(1013, "too_many_clients");
+      return;
+    }
+
+    ws.piRemoteAuthenticated = true;
     send(ws, remoteHello(publicState()));
     send(ws, { type: "history", messages: recentMessages(50), state: publicState() });
-    broadcast({ type: "client_count", count: wss?.clients.size ?? 0 });
+    broadcast({ type: "client_count", count: authenticatedClientCount(server.clients) });
 
     ws.on("message", (data) => {
+      if (ws.piRemoteRevoked) {
+        ws.terminate();
+        return;
+      }
       try {
         handleCommand(ws, JSON.parse(data.toString("utf8")));
       } catch (error: any) {
@@ -347,7 +480,7 @@ function attachServerHandlers(server: WebSocketServer, config: RemoteConfig, ctx
       }
     });
 
-    ws.on("close", () => broadcast({ type: "client_count", count: wss?.clients.size ?? 0 }));
+    ws.on("close", () => broadcast({ type: "client_count", count: wss ? authenticatedClientCount(wss.clients) : 0 }));
   });
 }
 
@@ -355,26 +488,20 @@ function announceListening(ctx: ExtensionContext, config: RemoteConfig) {
   const host = connectionHost(config);
   const lanHint = `${host}:${currentPort ?? config.port}`;
   ctx.ui.setStatus("remote", `remote ${lanHint}`);
-  ctx.ui.notify(
-    [
-      `Remote control listening on ${webSocketUrl(config)}`,
-      `Android deep link: ${deepLinkUrl(config)}`,
-      `Config: ${CONFIG_PATH}`,
-    ].join("\n"),
-    "info",
-  );
+  ctx.ui.notify(redactedStatusLines(config, host, currentPort ?? config.port).join("\n"), config.allowNoAuthFromLoopback ? "warning" : "info");
 }
 
 function startServer(ctx: ExtensionContext) {
   if (started) return;
-  started = true;
 
   currentConfig = loadConfig();
   const config = currentConfig;
   if (!config.enabled || ctx.mode !== "tui") {
+    started = false;
     ctx.ui.setStatus("remote", undefined);
     return;
   }
+  started = true;
 
   const tryPort = (port: number, attemptsLeft: number) => {
     const server = new WebSocketServer({ host: config.host, port, maxPayload: REMOTE_CONTROL_MAX_PAYLOAD });
@@ -467,17 +594,7 @@ export default function remoteControl(pi: ExtensionAPI) {
     description: "Show remote-control WebSocket connection info",
     handler: async (_args, ctx) => {
       const config = currentConfig ?? loadConfig();
-      ctx.ui.notify(
-        [
-          `Remote control: ${config.enabled ? "enabled" : "disabled"}`,
-          `WebSocket: ${webSocketUrl(config)}`,
-          `Android deep link: ${deepLinkUrl(config)}`,
-          `QR: run /remote-control-qr`,
-          `Config: ${CONFIG_PATH}`,
-          `For Android over LAN, set host to \"0.0.0.0\" and restart or /reload.`,
-        ].join("\n"),
-        "info",
-      );
+      ctx.ui.notify(redactedStatusLines(config).join("\n"), config.allowNoAuthFromLoopback ? "warning" : "info");
     },
   });
 
@@ -489,13 +606,13 @@ export default function remoteControl(pi: ExtensionAPI) {
       const qr = makeQr(link);
       ctx.ui.notify(
         [
-          "Scan with your phone camera to open Pi Remote:",
+          ...pairingWarningLines("Scan with your phone camera to open Pi Remote:"),
           "",
           qr,
           "",
           link,
         ].join("\n"),
-        "info",
+        "warning",
       );
     },
   });
@@ -512,10 +629,53 @@ export default function remoteControl(pi: ExtensionAPI) {
           return;
         }
         await runAdb(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", link, "com.mstat.piremote"]);
-        ctx.ui.notify(`Opened Pi Remote on Android.\n${link}`, "info");
+        ctx.ui.notify(pairingWarningLines(`Opened Pi Remote on Android.\n${link}`).join("\n"), "warning");
       } catch (error: any) {
-        ctx.ui.notify(`Failed to open Android app via adb:\n${error?.message ?? String(error)}\n\nDeep link:\n${link}`, "error");
+        ctx.ui.notify(pairingWarningLines(`Failed to open Android app via adb:\n${error?.message ?? String(error)}\n\nDeep link:\n${link}`).join("\n"), "error");
       }
+    },
+  });
+
+  pi.registerCommand("remote-control-rotate-token", {
+    description: "Rotate the Pi Remote auth token and disconnect existing clients",
+    handler: async (_args, ctx) => {
+      const config = { ...(currentConfig ?? loadConfig()), token: randomBytes(24).toString("base64url") };
+      writeConfig(config);
+      currentConfig = config;
+      if (wss) {
+        for (const client of wss.clients as Set<RemoteWebSocket>) {
+          client.piRemoteRevoked = true;
+          client.close(1008, "token rotated");
+          client.terminate();
+        }
+      }
+      ctx.ui.notify(["Remote-control token rotated. Existing Android clients must be paired again.", ...redactedStatusLines(config)].join("\n"), "warning");
+    },
+  });
+
+  pi.registerCommand("remote-control-disable", {
+    description: "Disable Pi Remote and stop the current server",
+    handler: async (_args, ctx) => {
+      const config = { ...(currentConfig ?? loadConfig()), enabled: false };
+      writeConfig(config);
+      currentConfig = config;
+      stopServer(ctx);
+      ctx.ui.notify("Remote control disabled. Run /remote-control-enable to re-enable it.", "warning");
+    },
+  });
+
+  pi.registerCommand("remote-control-enable", {
+    description: "Enable Pi Remote for TUI sessions",
+    handler: async (_args, ctx) => {
+      const config = { ...(currentConfig ?? loadConfig()), enabled: true };
+      writeConfig(config);
+      currentConfig = config;
+      if (ctx.mode !== "tui") {
+        ctx.ui.notify("Remote control is enabled in config but starts only in Pi TUI mode.", "warning");
+        return;
+      }
+      startServer(ctx);
+      ctx.ui.notify(redactedStatusLines(config).join("\n"), "info");
     },
   });
 }
