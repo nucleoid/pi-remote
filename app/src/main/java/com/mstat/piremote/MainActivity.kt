@@ -202,20 +202,17 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
     val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
     fun applyConnectionUri(uriText: String): Boolean {
-        return runCatching {
-            val uri = Uri.parse(uriText)
-            if (uri.scheme != "pi-remote") return@runCatching false
-            host = uri.host.orEmpty().ifBlank { host }
-            port = uri.port.takeIf { it > 0 }?.toString() ?: port
-            token = uri.getQueryParameter("token") ?: token
-            prefs.edit()
-                .putString("host", host.trim())
-                .putString("port", port.trim().ifBlank { "37891" })
-                .putString("token", token.trim())
-                .apply()
-            autoConnectRequest++
-            true
-        }.getOrDefault(false)
+        val parsed = parsePiRemoteUri(uriText, ConnectionSettings(host, port, token)) ?: return false
+        host = parsed.host
+        port = parsed.port
+        token = parsed.token
+        prefs.edit()
+            .putString("host", host.trim())
+            .putString("port", port.trim().ifBlank { "37891" })
+            .putString("token", token.trim())
+            .apply()
+        autoConnectRequest++
+        return true
     }
 
     LaunchedEffect(connectionUri) {
@@ -320,12 +317,20 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
         scrollVersion++
     }
 
+    fun mergeToolText(existing: String, update: String, done: Boolean): String {
+        if (existing.isBlank()) return update
+        if (update.isBlank() || update == existing) return existing
+        if (!done) return update
+        return listOf(existing, update).joinToString("\n\n")
+    }
+
     fun upsertToolMessage(toolCallId: String, title: String, text: String, done: Boolean) {
         val existingId = activeToolMessages[toolCallId]
         val index = existingId?.let { id -> messages.indexOfFirst { it.id == id } } ?: -1
         if (index >= 0) {
             val old = messages[index]
-            messages[index] = old.copy(title = title, text = text)
+            val updatedText = mergeToolText(old.text, text, done)
+            messages[index] = old.copy(title = title, text = updatedText)
         } else {
             val newId = nextId()
             activeToolMessages[toolCallId] = newId
@@ -346,6 +351,29 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
             .putString("port", port.trim().ifBlank { "37891" })
             .putString("token", token.trim())
             .apply()
+    }
+
+    fun normalizeUserEcho(text: String): String {
+        return text
+            .lineSequence()
+            .map { it.trim() }
+            .filter { line ->
+                line.isNotBlank() &&
+                    !line.startsWith("Attachments:", ignoreCase = true) &&
+                    line != "[image]" &&
+                    line != "[file]"
+            }
+            .joinToString("\n")
+            .trim()
+    }
+
+    fun isSameUserEcho(pending: String, echoed: String): Boolean {
+        if (pending == echoed) return true
+        val pendingText = normalizeUserEcho(pending)
+        val echoedText = normalizeUserEcho(echoed)
+        if (pendingText.isNotBlank() || echoedText.isNotBlank()) return pendingText == echoedText
+        return pending.contains("Attachments:", ignoreCase = true) &&
+            (echoed.contains("[image]") || echoed.contains("[file]"))
     }
 
     fun sendJson(type: String, text: String? = null) {
@@ -443,7 +471,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                         setSupportsBinaryFileAttachments = { supportsBinaryFileAttachments = it },
                         clearActiveAssistant = { activeAssistantId = null },
                         suppressUserEcho = { echoedText ->
-                            val index = pendingUserEchoes.indexOfFirst { it == echoedText }
+                            val index = pendingUserEchoes.indexOfFirst { pendingText -> isSameUserEcho(pendingText, echoedText) }
                             if (index >= 0) {
                                 pendingUserEchoes.removeAt(index)
                                 true
@@ -621,7 +649,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
             ) {
                 StatusPanel(status = status, connected = connected, working = working, sessionInfo = sessionInfo)
 
-                if (!keyboardVisible && (!connected || showSettings)) {
+                if (!connected || showSettings) {
                     if (connected && showSettings) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1270,144 +1298,18 @@ private fun handleIncoming(
     clearActiveAssistant: () -> Unit,
     suppressUserEcho: (String) -> Boolean,
 ) {
-    try {
-        val obj = JSONObject(text)
-        when (obj.optString("type")) {
-            "hello" -> {
-                val state = obj.optJSONObject("state")
-                val capabilities = obj.optJSONObject("capabilities")
-                setSupportsBinaryFileAttachments(obj.optInt("protocolVersion", 1) >= 2 || capabilities?.optBoolean("binaryFileAttachments", false) == true)
-                setWorking(!(state?.optBoolean("isIdle", true) ?: true))
-                setSessionInfo(describeState(state))
-            }
-            "user_message" -> {
-                val message = obj.optJSONObject("message")
-                val textContent = extractMessageText(message)
-                if (textContent.isNotBlank() && !suppressUserEcho(textContent)) addMessage(ChatKind.User, "User", textContent)
-            }
-            "history" -> {
-                val history = obj.optJSONArray("messages")
-                if (history != null) {
-                    for (i in 0 until history.length()) {
-                        val message = history.optJSONObject(i) ?: continue
-                        val role = message.optString("role")
-                        val textContent = extractMessageText(message)
-                        if (textContent.isBlank()) continue
-                        when (role) {
-                            "user" -> addMessage(ChatKind.User, "User", textContent)
-                            "assistant" -> addMessage(ChatKind.Assistant, "Assistant", textContent)
-                        }
-                    }
-                }
-                obj.optJSONObject("state")?.let {
-                    setWorking(!it.optBoolean("isIdle", true))
-                    setSessionInfo(describeState(it))
-                }
-            }
-            "assistant_delta" -> appendAssistantDelta(obj.optString("text"))
-            "thinking_delta" -> Unit
-            "tool_start" -> {
-                val toolName = obj.optString("toolName")
-                val toolCallId = obj.optString("toolCallId", "tool-${System.nanoTime()}")
-                val command = obj.optJSONObject("args")?.optString("command", "").orEmpty()
-                val summary = if (command.isNotBlank()) command.lineSequence().first().take(90) else "Running…"
-                upsertToolMessage(toolCallId, "$toolName running…", summary, false)
-            }
-            "tool_update" -> Unit
-            "tool_end" -> {
-                val toolName = obj.optString("toolName")
-                val toolCallId = obj.optString("toolCallId", "tool-${System.nanoTime()}")
-                upsertToolMessage(toolCallId, "$toolName ${if (obj.optBoolean("isError")) "failed" else "finished"}", if (obj.optBoolean("isError")) "Error" else "OK", true)
-            }
-            "agent_start" -> {
-                obj.optJSONObject("state")?.let { setSessionInfo(describeState(it)) }
-                setWorking(true)
-                clearActiveAssistant()
-            }
-            "agent_end" -> {
-                obj.optJSONObject("state")?.let { setSessionInfo(describeState(it)) }
-                setWorking(false)
-                clearActiveAssistant()
-            }
-            "assistant_message" -> Unit
-            "tool_call" -> Unit
-            "session_start" -> obj.optJSONObject("state")?.let { setSessionInfo(describeState(it)) }
-            "session_shutdown" -> Unit
-            "queue_update" -> Unit
-            "response" -> {
-                val data = obj.optJSONObject("data")
-                if (data?.has("cwd") == true || data?.has("state") == true) {
-                    val state = data.optJSONObject("state") ?: data
-                    setWorking(!state.optBoolean("isIdle", true))
-                    setSessionInfo(describeState(state))
-                }
-                if (!obj.optBoolean("success")) addMessage(ChatKind.Error, "Command failed", obj.optString("error"))
-            }
-            "error" -> addMessage(ChatKind.Error, "Remote error", obj.optString("error"))
-            "client_count" -> Unit
-            else -> {
-                val eventType = obj.optString("type", "Event")
-                if (eventType == "user_message") {
-                    val message = obj.optJSONObject("message")
-                    val textContent = extractMessageText(message)
-                    if (textContent.isNotBlank() && !suppressUserEcho(textContent)) addMessage(ChatKind.User, "User", textContent)
-                } else if (eventType != "session_shutdown") {
-                    addMessage(ChatKind.System, eventType, summarizeRawEvent(obj))
-                }
-            }
-        }
-    } catch (_: Exception) {
-        addMessage(ChatKind.System, "Raw event", text)
-    }
-}
-
-private fun summarizeRawEvent(obj: JSONObject): String {
-    return when (obj.optString("type")) {
-        "assistant_message" -> "Assistant message received"
-        "tool_call" -> "Tool call received"
-        else -> obj.toString().take(500)
-    }
-}
-
-private fun extractMessageText(message: JSONObject?): String {
-    if (message == null) return ""
-    val content = message.opt("content") ?: return ""
-    return when (content) {
-        is String -> content
-        is JSONArray -> buildString {
-            for (i in 0 until content.length()) {
-                val item = content.optJSONObject(i) ?: continue
-                when (item.optString("type")) {
-                    "text" -> {
-                        if (isNotEmpty()) append("\n")
-                        append(item.optString("text"))
-                    }
-                    "image" -> {
-                        if (isNotEmpty()) append("\n")
-                        append("[image]")
-                    }
-                }
-            }
-        }
-        else -> ""
-    }
+    val effects = parseIncoming(text, suppressUserEcho)
+    effects.messages.forEach { addMessage(it.kind, it.title, it.text) }
+    effects.assistantDeltas.forEach(appendAssistantDelta)
+    effects.toolUpdates.forEach { upsertToolMessage(it.toolCallId, it.title, it.text, it.done) }
+    effects.sessionInfo?.let(setSessionInfo)
+    effects.working?.let(setWorking)
+    effects.supportsBinaryFileAttachments?.let(setSupportsBinaryFileAttachments)
+    if (effects.clearActiveAssistant) clearActiveAssistant()
 }
 
 private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
     is android.app.Activity -> this
     is android.content.ContextWrapper -> baseContext.findActivity()
     else -> null
-}
-
-private fun describeState(state: JSONObject?): String {
-    if (state == null) return "No session state"
-    val cwd = state.optString("cwd", "")
-    val idle = state.optBoolean("isIdle", true)
-    val model = state.optJSONObject("model")
-    val modelText = if (model != null) "${model.optString("provider")}/${model.optString("id")}" else "unknown model"
-    return listOf(
-        if (idle) "Idle" else "Working",
-        modelText,
-        cwd,
-    ).filter { it.isNotBlank() }.joinToString(" • ")
 }
