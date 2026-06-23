@@ -1,11 +1,11 @@
-# @nucleoid/pi-remote-control
+# @pragmaticcoder/pi-remote-control
 
 Pi extension for pairing the π Remote Android app with an active Pi TUI session.
 
 ## Install
 
 ```bash
-pi install npm:@nucleoid/pi-remote-control
+pi install npm:@pragmaticcoder/pi-remote-control
 ```
 
 From this repository:

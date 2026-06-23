@@ -11,7 +11,7 @@ It is a developer tool, **not a hardened public service**. Do not expose the Web
 Primary catalog path:
 
 ```bash
-pi install npm:@nucleoid/pi-remote-control
+pi install npm:@pragmaticcoder/pi-remote-control
 ```
 
 Git/local install paths:
@@ -104,7 +104,7 @@ Management commands:
 ## Uninstall
 
 ```bash
-pi uninstall @nucleoid/pi-remote-control
+pi uninstall @pragmaticcoder/pi-remote-control
 adb uninstall com.pragmaticcoder.piremote
 ```
 

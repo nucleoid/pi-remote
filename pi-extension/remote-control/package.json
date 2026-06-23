@@ -1,5 +1,5 @@
 {
-  "name": "@nucleoid/pi-remote-control",
+  "name": "@pragmaticcoder/pi-remote-control",
   "version": "0.1.0",
   "description": "Pi extension for securely pairing the π Remote Android companion app with an active Pi TUI session.",
   "license": "MIT",
