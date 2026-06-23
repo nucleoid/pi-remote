@@ -142,7 +142,7 @@ The app scans nearby ports and shows matching Pi sessions, including whether the
 Android share targets are supported:
 
 - share text into the message box
-- share images/files as attachments
+- share images/files as attachments, including PDFs/documents as file attachments instead of inline binary text
 - optional auto-send shared content setting
 
 ## Screenshot gallery
@@ -170,6 +170,14 @@ Commands include:
 { "type": "get_history", "limit": 50 }
 { "type": "ping" }
 ```
+
+Prompt, steer, and follow-up commands can include attachments:
+
+- `images[]`: `{ "name": "photo.png", "mimeType": "image/png", "data": "<base64>" }`
+- `files[]` text: `{ "name": "notes.txt", "mimeType": "text/plain", "text": "..." }`
+- `files[]` binary/PDF: `{ "name": "spec.pdf", "mimeType": "application/pdf", "encoding": "base64", "data": "<base64>" }`
+
+The extension advertises binary-document support in `hello.capabilities.binaryFileAttachments`, validates binary attachments, and never dumps base64/PDF bytes into the prompt content.
 
 Events include:
 

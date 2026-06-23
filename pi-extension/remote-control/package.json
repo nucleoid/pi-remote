@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "client": "node client.mjs"
+    "client": "node client.mjs",
+    "test": "node --experimental-strip-types --test index.test.mjs"
   },
   "dependencies": {
     "qrcode-terminal": "^0.12.0",

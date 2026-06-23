@@ -74,9 +74,26 @@ Send JSON commands:
 { "type": "ping" }
 ```
 
+Prompts, steers, and follow-ups may include attachments. Images use `images[]` with base64 data; text files use `files[].text`; binary documents such as PDFs use `files[].data` plus `encoding: "base64"` and are rendered as attachment metadata rather than inline bytes.
+
+```json
+{
+  "type": "prompt",
+  "text": "Review this spec",
+  "files": [
+    {
+      "name": "spec.pdf",
+      "mimeType": "application/pdf",
+      "encoding": "base64",
+      "data": "JVBERi0x..."
+    }
+  ]
+}
+```
+
 Receive JSON events including:
 
-- `hello`
+- `hello` (`protocolVersion: 2`, `capabilities.binaryFileAttachments: true`)
 - `assistant_delta`
 - `assistant_message`
 - `tool_start`

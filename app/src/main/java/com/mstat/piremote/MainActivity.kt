@@ -5,8 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Bundle
-import android.util.Base64
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
@@ -155,13 +155,6 @@ data class ChatItem(
     val expanded: Boolean = false,
 )
 
-data class AttachmentItem(
-    val name: String,
-    val mimeType: String,
-    val base64: String? = null,
-    val text: String? = null,
-)
-
 data class SessionCandidate(
     val host: String,
     val port: Int,
@@ -197,6 +190,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
     var reconnectAttempts by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf("Disconnected") }
     var sessionInfo by remember { mutableStateOf("No session") }
+    var supportsBinaryFileAttachments by remember { mutableStateOf(false) }
     var activeAssistantId by remember { mutableStateOf<Long?>(null) }
     var scrollVersion by remember { mutableIntStateOf(0) }
     var autoConnectRequest by remember { mutableIntStateOf(0) }
@@ -252,6 +246,16 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
         scrollVersion++
     }
 
+    fun attachmentName(uri: Uri, mimeType: String): String {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) cursor.getString(index)?.takeIf { it.isNotBlank() }?.let { return it }
+            }
+        }
+        return uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: fallbackAttachmentName(mimeType)
+    }
+
     fun addAttachmentFromUri(uri: Uri) {
         if (attachments.size >= 4) {
             addMessage(ChatKind.Error, "Attachment limit", "Remove an attachment before adding more.")
@@ -259,34 +263,16 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
         }
         runCatching {
             val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
-            val name = uri.lastPathSegment ?: "attachment"
-            if (mimeType.startsWith("image/")) {
-                if (bytes.size > 5 * 1024 * 1024) {
-                    addMessage(ChatKind.Error, "Attachment too large", "$name is larger than 5MB")
-                    return@runCatching
-                }
-                attachments.add(
-                    AttachmentItem(
-                        name = name,
-                        mimeType = mimeType,
-                        base64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
-                    )
-                )
-            } else {
-                if (bytes.size > 200 * 1024) {
-                    addMessage(ChatKind.Error, "File too large", "$name is larger than 200KB text limit")
-                    return@runCatching
-                }
-                attachments.add(
-                    AttachmentItem(
-                        name = name,
-                        mimeType = mimeType,
-                        text = bytes.toString(Charsets.UTF_8),
-                    )
-                )
-            }
-        }.onFailure { addMessage(ChatKind.Error, "Attachment failed", it.message ?: "Could not read file") }
+            val name = attachmentName(uri, mimeType)
+            val attachment = context.contentResolver.openInputStream(uri)?.use { stream ->
+                createAttachmentForStream(name, mimeType, stream)
+            } ?: return@runCatching
+            attachments.add(attachment)
+        }.onFailure { error ->
+            val message = error.message ?: "Could not read file"
+            val title = if (message.contains("larger than")) "Attachment too large" else "Attachment failed"
+            addMessage(ChatKind.Error, title, message)
+        }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -368,34 +354,17 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
             addMessage(ChatKind.Error, "Not connected", "Connect to Pi before sending commands.")
             return
         }
-        val json = JSONObject()
-            .put("id", System.currentTimeMillis().toString())
-            .put("type", type)
-        if (text != null) json.put("text", text)
-        if (type in listOf("prompt", "steer", "follow_up") && attachments.isNotEmpty()) {
-            val images = JSONArray()
-            val files = JSONArray()
-            attachments.forEach { attachment ->
-                if (attachment.base64 != null) {
-                    images.put(
-                        JSONObject()
-                            .put("name", attachment.name)
-                            .put("mimeType", attachment.mimeType)
-                            .put("data", attachment.base64)
-                    )
-                } else if (attachment.text != null) {
-                    files.put(
-                        JSONObject()
-                            .put("name", attachment.name)
-                            .put("mimeType", attachment.mimeType)
-                            .put("text", attachment.text)
-                    )
-                }
-            }
-            if (images.length() > 0) json.put("images", images)
-            if (files.length() > 0) json.put("files", files)
+        if (type in listOf("prompt", "steer", "follow_up") && hasBinaryFileAttachment(attachments) && !supportsBinaryFileAttachments) {
+            addMessage(ChatKind.Error, "Unsupported attachment", "This Pi Remote server does not advertise binary file attachment support. Update the Pi extension and reconnect.")
+            return
         }
-        ws.send(json.toString())
+        val payload = runCatching { buildPromptJson(type, text, attachments).toString() }
+            .onFailure { addMessage(ChatKind.Error, "Send failed", it.message ?: "Message is too large") }
+            .getOrNull() ?: return
+        if (!ws.send(payload)) {
+            addMessage(ChatKind.Error, "Send failed", "Message is too large to queue; remove an attachment and try again.")
+            return
+        }
 
         when (type) {
             "prompt", "steer", "follow_up" -> {
@@ -456,6 +425,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                     connecting = false
                     showSettings = false
                     working = false
+                    supportsBinaryFileAttachments = false
                     status = "Connected"
                     reconnectAttempts = 0
                 }
@@ -470,6 +440,7 @@ fun PiRemoteApp(connectionUri: String? = null, sharedUris: List<String> = emptyL
                         upsertToolMessage = ::upsertToolMessage,
                         setSessionInfo = { sessionInfo = it },
                         setWorking = { working = it },
+                        setSupportsBinaryFileAttachments = { supportsBinaryFileAttachments = it },
                         clearActiveAssistant = { activeAssistantId = null },
                         suppressUserEcho = { echoedText ->
                             val index = pendingUserEchoes.indexOfFirst { it == echoedText }
@@ -1137,7 +1108,7 @@ private fun AttachmentChips(
                 onClick = { onRemove(attachment) },
                 label = {
                     Text(
-                        "${attachment.name} • ${if (attachment.base64 != null) "image" else "text"}",
+                        attachment.chipLabel,
                         maxLines = 1,
                     )
                 },
@@ -1295,6 +1266,7 @@ private fun handleIncoming(
     upsertToolMessage: (String, String, String, Boolean) -> Unit,
     setSessionInfo: (String) -> Unit,
     setWorking: (Boolean) -> Unit,
+    setSupportsBinaryFileAttachments: (Boolean) -> Unit = {},
     clearActiveAssistant: () -> Unit,
     suppressUserEcho: (String) -> Boolean,
 ) {
@@ -1303,6 +1275,8 @@ private fun handleIncoming(
         when (obj.optString("type")) {
             "hello" -> {
                 val state = obj.optJSONObject("state")
+                val capabilities = obj.optJSONObject("capabilities")
+                setSupportsBinaryFileAttachments(obj.optInt("protocolVersion", 1) >= 2 || capabilities?.optBoolean("binaryFileAttachments", false) == true)
                 setWorking(!(state?.optBoolean("isIdle", true) ?: true))
                 setSessionInfo(describeState(state))
             }
