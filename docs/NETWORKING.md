@@ -1,6 +1,6 @@
 # Networking recipes
 
-π Remote should only be used over trusted local paths.
+π Remote should only be used over trusted local paths. The durable daemon defaults to `127.0.0.1`, uses exactly one configured profile port, and never scans fallback ports. Bind `0.0.0.0` only as an explicit choice for a trusted LAN or VPN.
 
 ## LAN
 
@@ -42,6 +42,10 @@ adb reverse tcp:37891 tcp:37891
 ```
 
 Then pair Android with `127.0.0.1:37891`.
+
+## Rollout and port ownership
+
+Stop the legacy per-session extension listener before starting the daemon on the same port. An occupied port is an error, not a reason to select a nearby port. Restart briefly disconnects sockets; v3 consumers replay from their last processed cursor and Android v2 reconnects to the same root endpoint.
 
 ## Do not expose publicly
 

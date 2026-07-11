@@ -118,6 +118,18 @@ Management commands:
 
 `allowNoAuthFromLoopback` defaults to `false`, is warned when enabled, and never applies to LAN/Tailscale/public addresses.
 
+## Durable local daemon
+
+`@nucleoid/pi-remote-daemon` provides the profile-scoped durable control plane for the v3 protocol while retaining Android's protocol-v2 root socket. It is inert until explicitly started; the current extension remains the default until daemon integration lands.
+
+```bash
+npx pi-remote-daemon ensure
+npx pi-remote-daemon status
+npx pi-remote-daemon stop
+```
+
+Daemon state is under `~/.pi/agent/pi-remote/`. Fresh profiles bind only to `127.0.0.1`; existing deliberate host, port, token, and v2 loopback settings are imported narrowly. Do not run the old extension listener and daemon on the same configured port.
+
 ## Pi package catalog
 
 The Pi extension is published to npm as `@pragmaticcoder/pi-remote-control` with the `pi-package` keyword and Pi package manifest metadata. After the repository is public, it should be discoverable through [pi.dev/packages](https://pi.dev/packages).
@@ -151,7 +163,7 @@ The Pi extension is published to npm as `@pragmaticcoder/pi-remote-control` with
 - LAN vs Tailscale confusion: use the laptop's LAN IP on LAN, or its Tailscale IP/name over Tailscale.
 - Token mismatch: re-pair or rotate with `/remote-control-rotate-token`.
 - Firewall: allow the configured port on trusted LAN/VPN only.
-- Multiple sessions: each Pi TUI may use a different port if the default is busy.
+- Multiple legacy sessions: each Pi TUI may use a different port if the default is busy. The durable daemon intentionally uses one profile port and never falls back to another port.
 
 ## Uninstall
 

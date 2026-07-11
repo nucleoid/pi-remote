@@ -1,0 +1,31 @@
+{
+  "name": "@nucleoid/pi-remote-daemon",
+  "version": "0.1.0",
+  "description": "Durable local control plane for pi-remote",
+  "type": "module",
+  "bin": { "pi-remote-daemon": "./dist/cli.js" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./client": { "types": "./dist/client.d.ts", "default": "./dist/client.js" }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "pretest": "npm run build --workspace @nucleoid/pi-remote-protocol",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@nucleoid/pi-remote-protocol": "0.1.0",
+    "better-sqlite3": "12.11.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": { "node": "20.x || 22.x || 23.x || 24.x || 25.x || 26.x" }
+}

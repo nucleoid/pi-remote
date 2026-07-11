@@ -1,0 +1,2 @@
+import assert from"node:assert/strict";import{test}from"node:test";import{BoundedQueue}from"../src/backpressure.js";
+test("tiny deterministic queue limits close overloaded peers with resume checkpoint",()=>{const q=new BoundedQueue<{n:number}>(2,20,x=>JSON.stringify(x).length);q.push({n:1});q.push({n:2});assert.throws(()=>q.push({n:3}),/1013/);assert.equal(q.items,2);assert.ok(q.bytes<=20);assert.deepEqual(q.shift(),{n:1});assert.equal(q.shouldResume,true);});
