@@ -1,8 +1,6 @@
 # @pragmaticcoder/pi-remote-control
 
-Pi extension for pairing the π Remote Android app with an active Pi TUI session.
-
-This npm package is a Pi package (`pi-package`) and should be discoverable through [pi.dev/packages](https://pi.dev/packages) after the repository is public.
+Daemon-backed Pi extension for pairing the π Remote Android app with Pi TUI and RPC sessions.
 
 ## Install
 
@@ -10,41 +8,27 @@ This npm package is a Pi package (`pi-package`) and should be discoverable throu
 pi install npm:@pragmaticcoder/pi-remote-control
 ```
 
-From this repository:
-
-```bash
-pi install ./pi-extension/remote-control
-pi install git:github.com/nucleoid/pi-remote
-```
+The synchronous extension factory opens no sockets. An enabled TUI/RPC session asynchronously ensures the shared `@nucleoid/pi-remote-daemon`, authenticates over loopback `/control`, and registers stable process/session identity. JSON and print modes stay inactive, and RPC stdin/stdout are never read, written, or intercepted.
 
 ## Commands
 
-- `/remote-control` — safe status only; token-bearing URLs are redacted.
-- `/remote-control-qr` — explicit pairing command that shows a warning plus QR/deep link.
-- `/remote-control-android` — explicit pairing command that opens a token-bearing deep link through adb.
-- `/remote-control-rotate-token` — rotates the bearer token and disconnects existing clients.
-- `/remote-control-disable` — disables and stops the server.
-- `/remote-control-enable` — re-enables the server for TUI sessions.
+- `/remote-control` — redacted shared-daemon status.
+- `/remote-control-qr` — warning plus scoped Android v2 QR/deep link.
+- `/remote-control-android` — open the scoped link through adb.
+- `/remote-control-rotate-token` — revoke Android v2 credentials and disconnect paired clients.
+- `/remote-control-disable` — globally disable remote control for all Pi bridges/clients.
+- `/remote-control-enable` — enable the daemon and reconnect this bridge.
+
+The unchanged Android app continues to use `pi-remote://host:port?token=...` and protocol v2. Explicit pairing output contains a secret by design; ordinary status never does.
+
+## State and compatibility
+
+Daemon state is under `~/.pi/agent/pi-remote/` with best-effort private permissions. Existing deliberate legacy host, port, token, and loopback settings are imported narrowly. A normal default-port upgrade briefly reconnects Android and normally retains pairing. A prior fallback-port or non-selected-session pairing may require re-pairing.
+
+Session shutdown closes only that process bridge; it does not stop the daemon. Assigned events are retained until daemon acknowledgement and resume without renumbering. During an unbounded outage, the bounded spool explicitly emits a gap plus latest snapshot rather than blocking Pi or claiming losslessness.
 
 ## Security
 
-Do not expose the WebSocket port to the public internet. Use LAN, Tailscale/WireGuard, localhost, or SSH tunnels. `ws://` is cleartext by design for LAN/VPN use, so protect the network path. Treat tokens, QR codes, and `pi-remote://` links as secrets and rotate the token after any leak.
+Use LAN, Tailscale/WireGuard, localhost, or SSH tunnels; never expose the cleartext WebSocket directly to the public internet. Internal bridge credentials are separate from Android tokens and never appear in URLs, process arguments, status, errors, or logs.
 
-See the repository [security model](https://github.com/nucleoid/pi-remote/blob/main/docs/SECURITY-MODEL.md) for details.
-
-Configuration is stored at `~/.pi/agent/remote-control.json` with best-effort restrictive permissions. `allowNoAuthFromLoopback` defaults to `false`; if enabled it is warned in status and applies only to loopback addresses.
-
-## Config
-
-```json
-{
-  "enabled": true,
-  "host": "127.0.0.1",
-  "port": 37891,
-  "token": "generated-secret",
-  "allowNoAuthFromLoopback": false,
-  "maxClients": 3,
-  "failedAuthLimit": 8,
-  "failedAuthWindowMs": 60000
-}
-```
+Only public Pi extension controls are advertised: prompt/steer/follow-up, abort, model, thinking, and compaction. Queue/retry controls and forced process termination are rejected. Tool gates are optional; raw arguments are ephemeral and disclosed only by an explicitly trusted policy.

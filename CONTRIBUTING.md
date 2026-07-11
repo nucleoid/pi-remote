@@ -5,7 +5,7 @@
 - Android: `./gradlew test assembleDebug`
 - Node workspaces: `npm ci --legacy-peer-deps && npm test && npm run typecheck && npm run build && npm run pack:inspect`
 
-Use only the root `package-lock.json`; do not create workspace-local lockfiles. Protocol wire versions and `@nucleoid/pi-remote-protocol` package semver are versioned independently.
+Use only the root `package-lock.json`; do not create workspace-local lockfiles. Protocol wire versions and package semver are versioned independently. Bridge changes must test TUI/RPC lifecycle, real public Pi types, daemon restart/resume, scoped Android v2 pairing, bounded outage behavior, and production tarball contents. Keep `@nucleoid/pi-remote-daemon/client` free of eager native database imports.
 
 ## Security and screenshot hygiene
 

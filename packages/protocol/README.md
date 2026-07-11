@@ -10,4 +10,6 @@ Daemon messages use one JSON object per WebSocket text frame. The transport maxi
 
 Unknown properties and discriminants are forward-compatible. Known discriminants are validated strictly. Consumers receive durable events at least once and checkpoint global cursors; use `eventId` and `cursor` to deduplicate replay.
 
+Dashboard control uses an authenticated, connection-owned ephemeral lease bound to one live process/session. Typed `tool_gate.policy`, `tool_gate.request`, `tool_gate.decision`, `pause.arm`, and `pause.resume` frames route only through that lease. Bridge-applied state is confirmed with `dashboard.lease.state`; release or socket loss emits `dashboard.disconnected`. Policy frames, disclosed arguments, and replacement arguments are never written to durable replay or command storage.
+
 See the exported TypeBox schemas, validation helpers, negotiation state, cursor/producer reference stores, v2 fixture adapter, and content-free logging projections.

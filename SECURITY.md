@@ -1,10 +1,10 @@
 # Security Policy
 
-π Remote is a developer convenience tool for controlling an already-visible Pi TUI session. It is not designed to be an internet-facing service.
+π Remote is a developer convenience tool for controlling a Pi TUI or RPC session through a same-user local daemon. It is not designed to be an internet-facing service.
 
 ## Threat model
 
-The Pi extension streams session state, cwd, model/session metadata, messages, tool events, and accepted prompts to authenticated Android clients. Treat the auth token, QR code, and `pi-remote://` deep links as secrets.
+The extension sends bounded, allowlisted process/session observations to the authenticated local daemon. It does not enumerate environment variables, arguments, provider keys, system prompts, attachment bytes, or internal credentials. Treat Android tokens, QR codes, and `pi-remote://` links as secrets.
 
 ## Safe deployment
 
@@ -13,6 +13,7 @@ The Pi extension streams session state, cwd, model/session metadata, messages, t
 - The transport is cleartext `ws://` for LAN/VPN compatibility; protect it with a trusted network or tunnel.
 - Rotate the token with `/remote-control-rotate-token` if a QR code, deep link, screenshot, log, or token may have leaked.
 - Keep `allowNoAuthFromLoopback` disabled unless you are doing local-only testing. It never applies to non-loopback addresses.
+- Internal bridge credentials are never Android pairing credentials and are never placed in URLs, process arguments, status, or logs.
 
 ## Durable daemon data
 

@@ -2,6 +2,13 @@
 
 All notable changes to π Remote are documented here.
 
+## [0.2.0] - Unreleased
+
+- Replaced each session's WebSocket server with an authenticated registration bridge to one durable profile daemon.
+- Added TUI/RPC process isolation, stable nested-process identity, bounded durable event resume, truthful public-hook projection, supported remote controls, pause/tool-gate safety, and process-scoped Android pairing.
+- Preserved Android protocol v2, deep links, attachments, reconnect behavior, and command aliases without Android production changes.
+- Made rotate/disable daemon-wide; default-port upgrades normally retain pairing, while legacy fallback-port or non-selected-session pairings may require re-pairing.
+
 ## [0.1.2] - 2026-06-23
 
 First public release candidate.

@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "types": ["node"]
   },
-  "include": ["index.ts", "pi-coding-agent.d.ts"]
+  "include": ["*.ts"]
 }

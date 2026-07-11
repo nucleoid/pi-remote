@@ -13,9 +13,9 @@ pi install git:github.com/nucleoid/pi-remote
 pi install ./pi-extension/remote-control
 ```
 
-## 2. Start Pi in TUI mode
+## 2. Start Pi in TUI or RPC mode
 
-Run Pi normally in a terminal TUI session. π Remote controls an existing, visible Pi session; it is not a headless hosted agent.
+The extension starts no resources at factory load. On the first enabled TUI/RPC `session_start`, it asynchronously ensures the shared profile daemon and registers that Pi process. JSON and print modes do not start observation resources. RPC stdin/stdout remain untouched.
 
 ## 3. Pair Android
 
@@ -48,6 +48,10 @@ Compare with the SHA-256 shown in the release notes or `SHA256SUMS.txt` release 
 ## Play Protect
 
 Google Play Protect may warn that it has not seen this developer before. That is expected for a new GitHub-distributed APK that is not distributed through Google Play. Only install APKs from the official GitHub Releases page.
+
+## Upgrade from the per-session listener
+
+Reload stops the old listener before the shared daemon owns the configured port, so Android may reconnect briefly. Existing default-port pairings normally retain host, port, and token. Pairings to a legacy fallback port or a previously non-selected session may need `/remote-control-qr` again. Rotation and disable now apply daemon-wide and can affect other Pi processes.
 
 ## Uninstall
 

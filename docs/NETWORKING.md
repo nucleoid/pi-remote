@@ -13,7 +13,7 @@ Use the Pi host's LAN IP address and keep the port firewalled to the trusted net
 }
 ```
 
-Pair Android with the machine's LAN address, for example `192.168.1.50:37891`.
+Pair Android with the machine's LAN address, for example `192.168.1.50:37891`. Local Pi bridges still use an authenticated loopback route and never send their internal credential over the LAN address.
 
 ## Tailscale
 
@@ -45,7 +45,7 @@ Then pair Android with `127.0.0.1:37891`.
 
 ## Rollout and port ownership
 
-Stop the legacy per-session extension listener before starting the daemon on the same port. An occupied port is an error, not a reason to select a nearby port. Restart briefly disconnects sockets; v3 consumers replay from their last processed cursor and Android v2 reconnects to the same root endpoint.
+The upgraded extension stops its per-session listener and asynchronously ensures the daemon on the configured port. An occupied port is an error, not a reason to scan nearby ports. Restart briefly disconnects sockets; bridges replay retained assigned events from the daemon-authoritative process sequence, and Android v2 reconnects to the same root endpoint. Ordinary Pi shutdown never stops the daemon.
 
 ## Do not expose publicly
 

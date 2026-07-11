@@ -24,9 +24,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
-      - run: npm ci --legacy-peer-deps
+      - run: npm ci
       - run: npm audit --omit=dev
       - run: npm test
+      - run: node --experimental-strip-types --test pi-extension/remote-control/pack-install.test.mjs
       - run: npm run typecheck
       - run: npm run build
       - run: npm run pack:inspect
@@ -44,7 +45,7 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
-      - run: npm ci --legacy-peer-deps
+      - run: npm ci
       - run: npm test --workspace @nucleoid/pi-remote-daemon
 
   android:
