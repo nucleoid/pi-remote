@@ -1,59 +1,35 @@
 {
   "name": "@pragmaticcoder/pi-remote-control",
-  "version": "0.1.1",
-  "description": "Pi extension for securely pairing the π Remote Android companion app with an active Pi TUI session.",
+  "version": "0.2.0",
+  "description": "Daemon-backed bridge for securely pairing the π Remote Android companion with Pi TUI and RPC sessions.",
   "license": "MIT",
   "author": "pragmaticcoder.com",
   "homepage": "https://github.com/nucleoid/pi-remote#readme",
-  "bugs": {
-    "url": "https://github.com/nucleoid/pi-remote/issues"
-  },
+  "bugs": { "url": "https://github.com/nucleoid/pi-remote/issues" },
   "type": "module",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nucleoid/pi-remote.git",
-    "directory": "pi-extension/remote-control"
-  },
-  "keywords": [
-    "pi-package",
-    "pi",
-    "pi-extension",
-    "pi-coding-agent",
-    "remote-control",
-    "android",
-    "android-companion",
-    "tui",
-    "developer-tools",
-    "tailscale",
-    "wireguard"
-  ],
-  "pi": {
-    "extensions": [
-      "./index.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/nucleoid/pi-remote/main/docs/screenshots/main.png"
-  },
+  "repository": { "type": "git", "url": "git+https://github.com/nucleoid/pi-remote.git", "directory": "pi-extension/remote-control" },
+  "keywords": ["pi-package", "pi", "pi-extension", "remote-control", "android", "rpc", "daemon"],
+  "pi": { "extensions": ["./index.ts"], "image": "https://raw.githubusercontent.com/nucleoid/pi-remote/main/docs/screenshots/main.png" },
   "scripts": {
     "client": "node client.mjs",
-    "test": "node --experimental-strip-types --test index.test.mjs",
+    "pretest": "npm run build --workspace @nucleoid/pi-remote-protocol && npm run build --workspace @nucleoid/pi-remote-daemon",
+    "test": "node --experimental-strip-types --test *.test.mjs",
     "typecheck": "tsc --noEmit"
   },
-  "files": [
-    "README.md",
-    "index.ts",
-    "client.mjs"
-  ],
+  "files": ["README.md", "index.ts", "bridge.ts", "identity.ts", "events.ts", "outbox.ts", "controls.ts", "gates.ts", "attachments.ts", "pairing.ts", "config.ts", "client.mjs"],
   "dependencies": {
+    "@nucleoid/pi-remote-daemon": "0.1.0",
+    "@nucleoid/pi-remote-protocol": "0.1.0",
     "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.0"
   },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  },
+  "peerDependencies": { "@earendil-works/pi-coding-agent": "*", "typebox": "*" },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.6",
     "@types/node": "^22.10.2",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ws": "^8.5.13",
+    "typebox": "^1.1.38",
     "typescript": "^5.7.2"
   }
 }

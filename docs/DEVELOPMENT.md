@@ -35,7 +35,7 @@ npm run pack:inspect
 
 `@nucleoid/pi-remote-daemon` uses `better-sqlite3` 12.x, whose declared engine/prebuild matrix includes Node 22 on Linux and Windows. Its lifecycle tests run on both operating systems. The `./client` export must remain free of eager native SQLite imports.
 
-`@nucleoid/pi-remote-protocol` is publishable independently from the existing `@pragmaticcoder/pi-remote-control` extension. Its npm semver is independent from negotiated wire protocol versions. The root pack inspection must retain `pi.extensions: ["./pi-extension/remote-control/index.ts"]` and include that file.
+`@nucleoid/pi-remote-protocol`, `@nucleoid/pi-remote-daemon`, and `@pragmaticcoder/pi-remote-control` are independently publishable. Package semver is independent from negotiated wire protocol versions. Pack tests must include every extension runtime module, retain root `pi.extensions: ["./pi-extension/remote-control/index.ts"]`, and resolve protocol/daemon from production dependencies rather than unpublished `workspace:*` specs.
 
 ## End-to-end local testing
 
@@ -45,7 +45,7 @@ Use trusted local networking only. For USB-connected devices, ADB reverse is use
 adb reverse tcp:37891 tcp:37891
 ```
 
-Then pair with `127.0.0.1:37891` from Android.
+Then pair with `127.0.0.1:37891` from Android. Bridge integration tests cover two isolated processes, scoped v2 pairing, daemon restart/resume, and idle `agent_settled` projection. Do not modify `app/src/main/**` for bridge-only changes.
 
 ## Release signing
 

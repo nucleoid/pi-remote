@@ -24,7 +24,15 @@
     "README.md",
     "LICENSE",
     "pi-extension/remote-control/index.ts",
-    "pi-extension/remote-control/pi-coding-agent.d.ts"
+    "pi-extension/remote-control/bridge.ts",
+    "pi-extension/remote-control/identity.ts",
+    "pi-extension/remote-control/events.ts",
+    "pi-extension/remote-control/outbox.ts",
+    "pi-extension/remote-control/controls.ts",
+    "pi-extension/remote-control/gates.ts",
+    "pi-extension/remote-control/attachments.ts",
+    "pi-extension/remote-control/pairing.ts",
+    "pi-extension/remote-control/config.ts"
   ],
   "repository": {
     "type": "git",
@@ -50,10 +58,17 @@
     "image": "https://raw.githubusercontent.com/nucleoid/pi-remote/main/docs/screenshots/main.png"
   },
   "dependencies": {
+    "@nucleoid/pi-remote-daemon": "0.1.0",
+    "@nucleoid/pi-remote-protocol": "0.1.0",
     "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.6",
+    "typebox": "^1.1.38"
   }
 }

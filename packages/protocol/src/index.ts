@@ -7,12 +7,14 @@ export * from "./validation.js";
 export * from "./jsonl.js";
 export * from "./redaction.js";
 export * from "./v2-adapter.js";
+export * from "./policy.js";
 
 import { canonicalJson, ProtocolError, validateSchema } from "./validation.js";
 import { intersectKnownCapabilities } from "./capabilities.js";
 import { EventPublishSchema, parseEventBody } from "./events.js";
 import { CommandRequestSchema, parseCommandBody } from "./commands.js";
 import { EventsSubscribeSchema, HeartbeatSchema, HelloSchema, ProcessRegisterSchema } from "./messages.js";
+import { DashboardLeaseAcquireSchema, DashboardLeaseReleaseSchema, DashboardLeaseStateSchema, GatePolicySchema, PauseArmSchema, PauseResumeSchema, ToolGateDecisionSchema, ToolGateRequestSchema } from "./policy.js";
 
 export function negotiateHello(input: unknown, supportedVersions: readonly number[] = [3], supportedCapabilities: readonly string[] = []): { protocolVersion: 3; type: "welcome"; selectedVersion: number; capabilities: string[] } {
   const hello = validateSchema<any>(HelloSchema, input, "invalid_hello");
@@ -47,6 +49,30 @@ export class ProtocolSession {
       validateSchema(HeartbeatSchema, value, "invalid_heartbeat");
     } else if (value?.type === "events.subscribe") {
       validateSchema(EventsSubscribeSchema, value, "invalid_events_subscribe");
+    } else if (value?.type === "dashboard.lease.acquire") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(DashboardLeaseAcquireSchema, value, "invalid_dashboard_lease");
+    } else if (value?.type === "dashboard.lease.release") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(DashboardLeaseReleaseSchema, value, "invalid_dashboard_lease");
+    } else if (value?.type === "tool_gate.policy") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(GatePolicySchema, value, "invalid_gate_policy");
+    } else if (value?.type === "tool_gate.request") {
+      if (this.role !== "bridge") throw new ProtocolError("role_violation");
+      validateSchema(ToolGateRequestSchema, value, "invalid_tool_gate_request");
+    } else if (value?.type === "dashboard.lease.state") {
+      if (this.role !== "bridge") throw new ProtocolError("role_violation");
+      validateSchema(DashboardLeaseStateSchema, value, "invalid_dashboard_lease_state");
+    } else if (value?.type === "tool_gate.decision") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(ToolGateDecisionSchema, value, "invalid_tool_gate_decision");
+    } else if (value?.type === "pause.arm") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(PauseArmSchema, value, "invalid_pause_arm");
+    } else if (value?.type === "pause.resume") {
+      if (this.role !== "client") throw new ProtocolError("role_violation");
+      validateSchema(PauseResumeSchema, value, "invalid_pause_resume");
     }
     return undefined;
   }

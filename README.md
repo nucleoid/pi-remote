@@ -5,7 +5,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/nucleoid/pi-remote)](https://github.com/nucleoid/pi-remote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**π Remote** is an Android companion app plus Pi extension for controlling an existing, visible [Pi](https://github.com/earendil-works/pi-coding-agent) TUI session from your phone.
+**π Remote** is an Android companion app plus daemon-backed Pi extension for monitoring and controlling [Pi](https://github.com/earendil-works/pi-coding-agent) TUI or RPC sessions from your phone.
 
 It is a developer tool, **not a hardened public service**. Do not expose the WebSocket port to the public internet.
 
@@ -23,7 +23,7 @@ This release is intended for trusted personal networks, VPNs, and local tunnels.
    pi install npm:@pragmaticcoder/pi-remote-control
    ```
 
-2. Start Pi in TUI mode on your computer.
+2. Start Pi in TUI or RPC mode on your computer. The extension asynchronously ensures one shared profile daemon.
 3. Run `/remote-control-qr` in Pi and scan the QR code from Android.
 4. Install the signed APK from the latest GitHub Release.
 
@@ -101,26 +101,11 @@ Management commands:
 
 ## Configuration
 
-`~/.pi/agent/remote-control.json`:
-
-```json
-{
-  "enabled": true,
-  "host": "0.0.0.0",
-  "port": 37891,
-  "allowNoAuthFromLoopback": false,
-  "maxClients": 3,
-  "failedAuthLimit": 8,
-  "failedAuthWindowMs": 60000,
-  "token": "generated-secret"
-}
-```
-
-`allowNoAuthFromLoopback` defaults to `false`, is warned when enabled, and never applies to LAN/Tailscale/public addresses.
+Daemon configuration and private state live under `~/.pi/agent/pi-remote/`. Fresh installs bind `127.0.0.1:37891`. Existing explicit legacy host, port, token, and loopback choices are imported narrowly; internal bridge credentials are separate from Android v2 pairing tokens.
 
 ## Durable local daemon
 
-`@nucleoid/pi-remote-daemon` provides the profile-scoped durable control plane for the v3 protocol while retaining Android's protocol-v2 root socket. It is inert until explicitly started; the current extension remains the default until daemon integration lands.
+`@nucleoid/pi-remote-daemon` provides the profile-scoped durable control plane. The extension ensures it asynchronously on the first enabled TUI/RPC session, registers each Pi process independently over authenticated loopback v3, and retains Android's protocol-v2 root socket.
 
 ```bash
 npx pi-remote-daemon ensure
@@ -128,7 +113,7 @@ npx pi-remote-daemon status
 npx pi-remote-daemon stop
 ```
 
-Daemon state is under `~/.pi/agent/pi-remote/`. Fresh profiles bind only to `127.0.0.1`; existing deliberate host, port, token, and v2 loopback settings are imported narrowly. Do not run the old extension listener and daemon on the same configured port.
+Ordinary Pi session shutdown disconnects only that bridge; it does not stop the shared daemon. Reload migration briefly reconnects Android. Default-port pairings normally continue to work, while a legacy fallback-port or previously selected secondary session may require re-pairing.
 
 ## Pi package catalog
 

@@ -8,7 +8,7 @@ An authenticated Android client can receive session state, working/idle status, 
 
 ## Authentication
 
-The Pi extension generates a bearer token and stores it in `~/.pi/agent/remote-control.json`. Treat the token, QR code, and `pi-remote://` deep links as secrets.
+The daemon issues scoped Android v2 tokens and keeps its separate same-user internal credential in `~/.pi/agent/pi-remote/credentials.json`. Treat Android tokens, QR codes, and `pi-remote://` deep links as secrets. Internal credentials are never pairing material.
 
 Rotate a token after any suspected leak:
 
@@ -18,7 +18,7 @@ Rotate a token after any suspected leak:
 
 ## Transport and protocol versions
 
-The deployed Android integration remains protocol v2 at `/?token=...`. Protocol v3 schemas and codecs are additive and are not wired to the current server yet. Future v3 sockets authenticate during HTTP upgrade before negotiating the highest common version with `hello`/`welcome`; no command, registration, subscription, or event is accepted before negotiation.
+The unchanged Android integration remains protocol v2 at `/?token=...`. Pi bridges use authenticated `/control` protocol v3, negotiate `hello`/`welcome`, register stable process/session identity, and resume from the daemon-authoritative process sequence. No command, registration, subscription, or event is accepted before negotiation.
 
 The WebSocket transport is cleartext `ws://` by design for LAN, VPN, localhost, and SSH tunnel use. Each v3 message is exactly one JSON object in one text frame; binary frames and malformed framing are protocol errors. The future JSONL codec is not attached to Pi RPC stdin/stdout. Use a trusted network path:
 
@@ -40,7 +40,7 @@ The Android app stores connection settings in encrypted preferences and disables
 
 ## Authorization, replay, and logging
 
-Negotiated connection capabilities do not grant authority. A command also requires the authenticated principal's scope and the target process capability. Durable event delivery is at-least-once across reconnects; consumers deduplicate by event ID/global cursor. Tool-gate decisions and replacement arguments are ephemeral and must not be persisted.
+Negotiated connection capabilities do not grant authority. A command also requires the authenticated principal's scope and the target process capability. Gate and pause control additionally require a daemon-issued dashboard lease owned by the authenticated control socket and bound to one live process/session. The daemon validates and routes those frames in memory; release or dashboard disconnect invalidates the lease and notifies the bridge. Durable event delivery is at-least-once across reconnects; consumers deduplicate by event ID/global cursor. Gate policies, argument disclosure, decisions, and replacement arguments are ephemeral and are never persisted.
 
 Protocol errors contain only a bounded code, path, and safe message. Use the SDK's content-free log projections and `redactForLog()` rather than logging wire payloads.
 
@@ -49,6 +49,8 @@ Protocol errors contain only a bounded code, path, and safe message. Use the SDK
 The daemon authenticates health, protocol discovery, v3 control, and admin operations even on loopback. Android's query token and explicit no-auth loopback compatibility apply only to the root v2 socket. Private internal credentials and keyed token verifiers live in `~/.pi/agent/pi-remote/credentials.json`; do not copy this file. SQLite history is sensitive and excludes attachment bytes, authorization values, raw environment, credentials, token-bearing URLs, and ephemeral gate argument replacements.
 
 The daemon binds loopback for fresh profiles, never chooses a fallback port, and fails closed when lock ownership cannot be verified. Stop it through its authenticated control endpoint rather than killing a PID read from a lock file.
+
+Remote controls advertise only public Pi extension capabilities. Queue/retry mode changes and forced process termination are rejected. Tool argument disclosure is ephemeral and opt-in; complete replacement arguments are recursively checked for dangerous keys and validated against the exact tool schema before prototype-safe in-place mutation.
 
 ## Screenshot/log hygiene
 
