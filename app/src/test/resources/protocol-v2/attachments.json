@@ -1,0 +1,17 @@
+{
+  "maxAttachments": 4,
+  "maxImageDecodedBytes": 5242880,
+  "maxBinaryDecodedBytes": 5242880,
+  "maxTextBytes": 204800,
+  "maxOutboundBytes": 15728640,
+  "prompt": {
+    "type": "prompt",
+    "text": "Inspect demo files",
+    "deliverAs": "prompt",
+    "images": [{"name":"pixel.png","mimeType":"image/png","data":"iVBORw0KGgo="}],
+    "files": [
+      {"name":"notes.txt","mimeType":"text/plain","text":"Demo notes"},
+      {"name":"sample.pdf","mimeType":"application/pdf","encoding":"base64","data":"JVBERi0xLjc="}
+    ]
+  }
+}

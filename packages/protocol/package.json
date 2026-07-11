@@ -1,0 +1,19 @@
+{
+  "name": "@nucleoid/pi-remote-protocol",
+  "version": "0.1.0",
+  "description": "Schema-first protocol v3 contracts and codecs for Pi Remote",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": { "@sinclair/typebox": "^0.34.51" },
+  "devDependencies": { "@types/node": "^22.10.2", "tsx": "^4.20.6", "typescript": "^5.7.2" },
+  "license": "MIT",
+  "publishConfig": { "access": "public" }
+}

@@ -15,6 +15,22 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - run: python3 scripts/scan-sensitive.py
 
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npm audit --omit=dev
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run pack:inspect
+
   android:
     runs-on: ubuntu-latest
     steps:
@@ -25,21 +41,3 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
       - run: ./gradlew test assembleDebug
-
-  pi-extension:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pi-extension/remote-control
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: pi-extension/remote-control/package-lock.json
-      - run: npm ci --legacy-peer-deps
-      - run: npm audit --omit=dev
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm pack --dry-run

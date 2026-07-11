@@ -6,6 +6,18 @@ import java.io.ByteArrayInputStream
 
 class AttachmentPayloadTest {
     @Test
+    fun sharedV2AttachmentFixturePreservesAndroidLimitsAndWireShapes() {
+        val text = checkNotNull(javaClass.classLoader?.getResource("protocol-v2/attachments.json")).readText()
+        val fixture = org.json.JSONObject(text)
+        assertEquals(4, fixture.getInt("maxAttachments"))
+        assertEquals(MAX_WEBSOCKET_SEND_BYTES, fixture.getInt("maxOutboundBytes"))
+        val prompt = fixture.getJSONObject("prompt")
+        assertEquals("prompt", prompt.getString("deliverAs"))
+        assertEquals(1, prompt.getJSONArray("images").length())
+        assertEquals("base64", prompt.getJSONArray("files").getJSONObject(1).getString("encoding"))
+    }
+
+    @Test
     fun pdfIsBinaryFilePayloadWithChipMetadata() {
         val attachment = createAttachmentForBytes(
             name = "1000006477.pdf",

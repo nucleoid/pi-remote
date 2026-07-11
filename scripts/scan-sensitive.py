@@ -43,6 +43,14 @@ TEXT_DEEP_LINK_NEEDLES = [
     "token=",
 ]
 
+FIXTURE_PRIVATE_NEEDLES = [
+    "C:\\Users\\mstat",
+    "/home/mstat/",
+    "100.76.124.34",
+    "demo-release-token",
+    "super-secret-token",
+]
+
 ALLOW_DEEP_LINK_TEXT = {
     "README.md",
     "SECURITY.md",
@@ -89,16 +97,18 @@ def main() -> int:
 
     for path in files:
         relative = rel(path)
-        if path.suffix.lower() not in {".md", ".txt", ".yml", ".yaml", ".json"}:
-            continue
-        if relative in ALLOW_DEEP_LINK_TEXT:
+        if path.suffix.lower() not in {".md", ".txt", ".yml", ".yaml", ".json", ".jsonl", ".log"}:
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        if all(needle in text for needle in TEXT_DEEP_LINK_NEEDLES):
+        if relative not in ALLOW_DEEP_LINK_TEXT and all(needle in text for needle in TEXT_DEEP_LINK_NEEDLES):
             failures.append(f"possible token-bearing deep link in {relative}")
+        if "/resources/protocol-v2/" in f"/{relative}" or path.suffix.lower() == ".log":
+            for needle in FIXTURE_PRIVATE_NEEDLES:
+                if needle.lower() in text.lower():
+                    failures.append(f"fixture/log {relative} contains private marker {needle!r}")
 
     if failures:
         print("Sensitive-content scan failed:", file=sys.stderr)
