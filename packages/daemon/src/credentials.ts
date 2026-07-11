@@ -1,0 +1,8 @@
+import{randomBytes,createHmac}from"node:crypto";
+import{closeSync,existsSync,fsyncSync,linkSync,mkdirSync,openSync,readFileSync,renameSync,unlinkSync,writeFileSync}from"node:fs";
+import{dirname}from"node:path";
+export type Credentials={key:string;adminToken:string};
+function parse(path:string):Credentials{const value=JSON.parse(readFileSync(path,"utf8"));if(!value||typeof value.key!=="string"||value.key.length<32||typeof value.adminToken!=="string"||value.adminToken.length<32)throw new Error("invalid credentials");return value;}
+function create(path:string):Credentials{const value={key:randomBytes(32).toString("base64url"),adminToken:randomBytes(32).toString("base64url")},temp=`${path}.tmp-${process.pid}-${randomBytes(6).toString("hex")}`;const fd=openSync(temp,"wx",0o600);try{writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);}finally{closeSync(fd);}try{linkSync(temp,path);}catch(e:any){if(e.code!=="EEXIST")throw e;return parse(path);}finally{try{unlinkSync(temp);}catch{}}return value;}
+export function loadOrCreateCredentials(path:string):Credentials{mkdirSync(dirname(path),{recursive:true});if(!existsSync(path))return create(path);try{return parse(path);}catch{const corrupt=`${path}.corrupt`;try{renameSync(path,corrupt);}catch(e:any){if(e.code==="EEXIST")renameSync(path,`${corrupt}-${Date.now()}`);else throw new Error(`credentials_corrupt: ${path}`,{cause:e});}try{return create(path);}catch(e){throw new Error(`credentials_corrupt_recovery_failed: ${path}`,{cause:e});}}}
+export function tokenVerifier(key:string,token:string){return createHmac("sha256",key).update(token).digest("hex");}

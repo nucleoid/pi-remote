@@ -1,0 +1,12 @@
+import{canonicalJson}from"@nucleoid/pi-remote-protocol";
+type Command={commandId:string;processId:string;processInstanceId:string;payload:unknown;expiresAt?:number};
+type Store={acceptCommand(principal:string,value:Command):{duplicate:boolean;state:string;result?:unknown};completeCommand(id:string,result:unknown):void;failCommandsForInstance(id:string):void};
+export class CommandRouter{
+  #bindings=new Map<string,{send:(x:unknown)=>void;live:()=>boolean}>();#commands=new Map<string,{canonical:string,state:string,target:string;notify?:(x:unknown)=>void}>();
+  constructor(private store?:Store){}
+  bind(p:string,i:string,send:(x:unknown)=>void,live:()=>boolean){this.#bindings.set(`${p}\0${i}`,{send,live});}
+  accept(principal:string,c:Command,notify?:(x:unknown)=>void){const canonical=canonicalJson({principal,c}),old=this.#commands.get(c.commandId);if(old){if(old.canonical!==canonical)throw new Error("command_conflict");return{duplicate:true,state:old.state};}const key=`${c.processId}\0${c.processInstanceId}`,binding=this.#bindings.get(key);if(!binding||!binding.live())throw new Error("target_unavailable");const durable=this.store?.acceptCommand(principal,c);this.#commands.set(c.commandId,{canonical,state:durable?.state??"accepted",target:key,notify});if(!durable?.duplicate)binding.send({protocolVersion:3,type:"command.request",commandId:c.commandId,targetProcessId:c.processId,processInstanceId:c.processInstanceId,command:c.payload});else if(durable.result)notify?.(durable.result);return{duplicate:durable?.duplicate??false,state:durable?.state??"accepted"};}
+  complete(p:string,i:string,result:any){const item=this.#commands.get(result.commandId);if(!item||item.target!==`${p}\0${i}`)throw new Error("result_before_ack");const safe={protocolVersion:3,type:"command.result",commandId:result.commandId,status:result.status,...(result.result===undefined?{}:{result:result.result}),...(result.error===undefined?{}:{error:result.error})};this.store?.completeCommand(result.commandId,safe);item.state=result.status;item.notify?.(safe);return safe;}
+  disconnect(p:string,i:string){const key=`${p}\0${i}`;this.#bindings.delete(key);this.store?.failCommandsForInstance(i);for(const x of this.#commands.values())if(x.target===key&&x.state==="accepted"){x.state="failed:bridge_disconnected";x.notify?.({protocolVersion:3,type:"command.result",commandId:[...this.#commands].find(([,v])=>v===x)?.[0],status:"failed",error:{code:"bridge_disconnected",message:"Bridge disconnected"}});}}
+  state(id:string){return this.#commands.get(id)?.state;}
+}

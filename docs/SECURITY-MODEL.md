@@ -44,6 +44,12 @@ Negotiated connection capabilities do not grant authority. A command also requir
 
 Protocol errors contain only a bounded code, path, and safe message. Use the SDK's content-free log projections and `redactForLog()` rather than logging wire payloads.
 
+## Durable local control plane
+
+The daemon authenticates health, protocol discovery, v3 control, and admin operations even on loopback. Android's query token and explicit no-auth loopback compatibility apply only to the root v2 socket. Private internal credentials and keyed token verifiers live in `~/.pi/agent/pi-remote/credentials.json`; do not copy this file. SQLite history is sensitive and excludes attachment bytes, authorization values, raw environment, credentials, token-bearing URLs, and ephemeral gate argument replacements.
+
+The daemon binds loopback for fresh profiles, never chooses a fallback port, and fails closed when lock ownership cannot be verified. Stop it through its authenticated control endpoint rather than killing a PID read from a lock file.
+
 ## Screenshot/log hygiene
 
 Before sharing screenshots or logs, remove:

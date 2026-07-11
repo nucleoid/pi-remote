@@ -1,0 +1,2 @@
+import assert from "node:assert/strict"; import { test } from "node:test"; import { ProcessRegistry } from "../src/process-registry.js";
+test("three missed heartbeats become stale and six become dead using monotonic time",()=>{let now=0;const events:string[]=[];const r=new ProcessRegistry(()=>now,(id,state)=>events.push(`${id}:${state}`));r.register("i",1000);now=3001;r.sweep();assert.equal(r.state("i"),"stale");assert.equal(r.canRoute("i"),false);now=6001;r.sweep();assert.equal(r.state("i"),"dead");assert.deepEqual(events,["i:stale","i:dead"]);});
