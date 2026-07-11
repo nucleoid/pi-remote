@@ -1,0 +1,6 @@
+{"type":"tool_call","toolCall":{"id":"tool-demo","name":"read","arguments":{"path":"README.md"}}}
+{"type":"tool_start","toolCallId":"tool-demo","toolName":"read","args":{"path":"README.md"}}
+{"type":"tool_update","toolCallId":"tool-demo","toolName":"read","partialResult":{"content":"Demo content"}}
+{"type":"tool_end","toolCallId":"tool-demo","toolName":"read","result":{"content":"Demo content"},"isError":false}
+{"type":"response","id":"command-demo","success":true}
+{"type":"error","error":"demo_error"}

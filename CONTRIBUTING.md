@@ -3,7 +3,9 @@
 ## Development
 
 - Android: `./gradlew test assembleDebug`
-- Pi extension: `cd pi-extension/remote-control && npm test && npm run typecheck && npm pack --dry-run`
+- Node workspaces: `npm ci --legacy-peer-deps && npm test && npm run typecheck && npm run build && npm run pack:inspect`
+
+Use only the root `package-lock.json`; do not create workspace-local lockfiles. Protocol wire versions and `@nucleoid/pi-remote-protocol` package semver are versioned independently.
 
 ## Security and screenshot hygiene
 

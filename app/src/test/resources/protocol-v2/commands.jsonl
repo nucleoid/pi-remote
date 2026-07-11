@@ -1,0 +1,8 @@
+{"type":"ping","id":"1"}
+{"type":"get_state","id":"2"}
+{"type":"get_history","id":"3","limit":50}
+{"type":"prompt","id":"4","text":"Demo prompt","images":[],"files":[],"deliverAs":"prompt"}
+{"type":"steer","id":"5","text":"Demo steer"}
+{"type":"follow_up","id":"6","text":"Demo follow up"}
+{"type":"followUp","id":"7","text":"Legacy demo follow up"}
+{"type":"abort","id":"8"}

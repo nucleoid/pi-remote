@@ -16,9 +16,11 @@ Rotate a token after any suspected leak:
 /remote-control-rotate-token
 ```
 
-## Transport
+## Transport and protocol versions
 
-The WebSocket transport is cleartext `ws://` by design for LAN, VPN, localhost, and SSH tunnel use. Use a trusted network path:
+The deployed Android integration remains protocol v2 at `/?token=...`. Protocol v3 schemas and codecs are additive and are not wired to the current server yet. Future v3 sockets authenticate during HTTP upgrade before negotiating the highest common version with `hello`/`welcome`; no command, registration, subscription, or event is accepted before negotiation.
+
+The WebSocket transport is cleartext `ws://` by design for LAN, VPN, localhost, and SSH tunnel use. Each v3 message is exactly one JSON object in one text frame; binary frames and malformed framing are protocol errors. The future JSONL codec is not attached to Pi RPC stdin/stdout. Use a trusted network path:
 
 - LAN you control
 - Tailscale
@@ -35,6 +37,12 @@ The Android app stores connection settings in encrypted preferences and disables
 ## Loopback no-auth mode
 
 `allowNoAuthFromLoopback` defaults to `false`. If enabled, it applies only to loopback addresses and is called out in status output. Keep it disabled except for local testing.
+
+## Authorization, replay, and logging
+
+Negotiated connection capabilities do not grant authority. A command also requires the authenticated principal's scope and the target process capability. Durable event delivery is at-least-once across reconnects; consumers deduplicate by event ID/global cursor. Tool-gate decisions and replacement arguments are ephemeral and must not be persisted.
+
+Protocol errors contain only a bounded code, path, and safe message. Use the SDK's content-free log projections and `redactForLog()` rather than logging wire payloads.
 
 ## Screenshot/log hygiene
 

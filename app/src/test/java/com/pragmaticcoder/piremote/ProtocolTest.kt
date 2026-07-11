@@ -9,6 +9,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProtocolTest {
+    private fun fixture(name: String): String = checkNotNull(javaClass.classLoader?.getResource("protocol-v2/$name")).readText()
+
+    @Test
+    fun sharedV2FixturesPreserveHelloHistoryLifecycleToolsAndUnknownTolerance() {
+        val hello = parseIncoming(fixture("hello.json"))
+        assertEquals(false, hello.working)
+        assertTrue(hello.sessionInfo!!.startsWith("Idle"))
+
+        val history = parseIncoming(fixture("history.json"))
+        assertEquals(listOf(ChatKind.User, ChatKind.Assistant), history.messages.map { it.kind })
+
+        val fixtureEvents = listOf("lifecycle.jsonl", "tools.jsonl")
+            .flatMap { fixture(it).lineSequence().filter(String::isNotBlank).toList() }
+        assertTrue(fixtureEvents.map(::parseIncoming).any { it.working == true })
+        assertTrue(parseIncoming("{\"type\":\"future_v2_event\",\"value\":1}").messages.isNotEmpty())
+    }
+
     @Test
     fun parsePiRemoteUri_appliesHostPortAndDecodedToken() {
         val parsed = parsePiRemoteUri(
@@ -214,5 +231,12 @@ class ProtocolTest {
     fun summarizeRawEvent_usesStableSummariesForNoisyEvents() {
         assertEquals("Assistant message received", summarizeRawEvent(JSONObject().put("type", "assistant_message")))
         assertEquals("Tool call received", summarizeRawEvent(JSONObject().put("type", "tool_call")))
+    }
+
+    @Test
+    fun sharedV2CommandFixtureContainsCurrentCommandsAndLegacyAlias() {
+        val commands = fixture("commands.jsonl").lineSequence().filter(String::isNotBlank).map { JSONObject(it) }.toList()
+        assertEquals(setOf("ping", "get_state", "get_history", "prompt", "steer", "follow_up", "followUp", "abort"), commands.map { it.getString("type") }.toSet())
+        assertTrue(commands.filter { it.getString("type") == "prompt" }.single().has("deliverAs"))
     }
 }

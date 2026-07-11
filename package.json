@@ -10,6 +10,22 @@
     "url": "https://github.com/nucleoid/pi-remote/issues"
   },
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "pi-extension/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "pack:inspect": "npm pack --dry-run && npm pack --dry-run --workspace @nucleoid/pi-remote-protocol && npm pack --dry-run --workspace @pragmaticcoder/pi-remote-control"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "pi-extension/remote-control/index.ts",
+    "pi-extension/remote-control/pi-coding-agent.d.ts"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nucleoid/pi-remote.git"

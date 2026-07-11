@@ -1,0 +1,10 @@
+{"type":"session_start","state":{"isIdle":true}}
+{"type":"agent_start","state":{"isIdle":false}}
+{"type":"user_message","message":{"role":"user","content":"Demo question"}}
+{"type":"assistant_delta","text":"Demo"}
+{"type":"thinking_delta","text":"Considering"}
+{"type":"assistant_message","message":{"role":"assistant","content":"Demo answer"}}
+{"type":"queue_update","steering":[],"followUp":[]}
+{"type":"agent_end","state":{"isIdle":true}}
+{"type":"client_count","count":1}
+{"type":"session_shutdown"}

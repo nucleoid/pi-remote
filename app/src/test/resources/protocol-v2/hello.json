@@ -1,0 +1,1 @@
+{"type":"hello","server":"pi-remote-control","protocolVersion":2,"capabilities":{"binaryFileAttachments":true},"state":{"isIdle":true,"cwd":"/home/demo/projects/example-app","model":{"provider":"openai","id":"gpt-demo"}}}
