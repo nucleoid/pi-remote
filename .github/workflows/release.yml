@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1
       - name: Decode signing keystore
         env:
           PI_REMOTE_RELEASE_KEYSTORE_BASE64: ${{ secrets.PI_REMOTE_RELEASE_KEYSTORE_BASE64 }}
