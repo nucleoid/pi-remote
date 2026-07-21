@@ -25,7 +25,7 @@
   },
   "peerDependencies": { "@earendil-works/pi-coding-agent": "*", "typebox": "*" },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.10",
     "@types/node": "^22.10.2",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ws": "^8.5.13",
